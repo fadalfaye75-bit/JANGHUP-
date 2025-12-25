@@ -1,11 +1,10 @@
 
-import React, { lazy, Suspense, useEffect, ReactNode, Component } from 'react';
+import React, { lazy, Suspense, useEffect, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { NotificationProvider } from './context/NotificationContext.tsx';
 import { ChatProvider } from './context/ChatContext.tsx';
 import { Loader2, RefreshCcw, AlertTriangle, LogOut } from 'lucide-react';
-import { UserRole } from './types.ts';
 
 interface ErrorBoundaryProps {
   children?: ReactNode;
@@ -16,14 +15,14 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
+// Added constructor to explicitly initialize and type the component's state and props
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public state: ErrorBoundaryState = {
-    hasError: false,
-    error: null
-  };
-
   constructor(props: ErrorBoundaryProps) {
     super(props);
+    this.state = {
+      hasError: false,
+      error: null
+    };
   }
   
   static getDerivedStateFromError(error: Error) { 
@@ -68,6 +67,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         </div>
       );
     }
+    // Fixed direct props access
     return this.props.children;
   }
 }
@@ -96,6 +96,7 @@ const LoadingFallback = () => (
   </div>
 );
 
+// Changed children to optional to satisfy compiler requirements when used in Route elements
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
