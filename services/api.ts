@@ -4,7 +4,6 @@ import { User, Announcement, Exam, MeetLink, Poll, ClassGroup, ActivityLog, AppN
 
 /**
  * Lead Engineer Helper: Ensures we always have a valid user before mutating.
- * Prevents 42501 RLS errors in frontend.
  */
 const getAuthUser = async () => {
   const { data: { user }, error } = await supabase.auth.getUser();
@@ -12,24 +11,10 @@ const getAuthUser = async () => {
   return user;
 };
 
-const getErrorMessage = (error: any): string => {
-  if (!error) return "";
-  if (typeof error === 'string') return error;
-  if (error.message && typeof error.message === 'string') return error.message;
-  if (error.error_description) return error.error_description;
-  return "Erreur technique inconnue.";
-};
-
 const handleAPIError = (error: any, fallback: string) => {
   if (!error) return;
-  const detailedMsg = getErrorMessage(error);
   console.error(`[SRE API Audit] ${fallback}:`, error);
-  
-  let message = fallback;
-  if (error.code === '23505') message = "Cette donnée existe déjà.";
-  else if (error.code === '42501') message = "Permission refusée (Sécurité RLS).";
-  else if (detailedMsg && detailedMsg !== "{}") message = `${fallback}: ${detailedMsg}`;
-  
+  const message = error.message || fallback;
   throw new Error(message);
 };
 
@@ -57,20 +42,40 @@ export const API = {
     
     getSession: async (): Promise<User | null> => {
       try {
-        const user = await getAuthUser();
-        const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-        if (error || !profile) return null;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+        if (!profile) return null;
         return mapProfile(profile);
       } catch (e) { return null; }
     },
     
     login: async (email: string, pass: string): Promise<User> => {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: pass });
-      if (error) handleAPIError(error, "Connexion échouée");
-      if (!data?.user) throw new Error("Identifiants incorrects.");
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.trim().toLowerCase(), 
+        password: pass 
+      });
       
-      const { data: profile, error: pErr } = await supabase.from('profiles').select('*').eq('id', data.user.id).maybeSingle();
-      if (pErr || !profile) throw new Error("Profil introuvable après connexion.");
+      if (error) {
+        console.warn("[Auth Error]", error.message);
+        throw new Error(error.message);
+      }
+      
+      if (!data?.user) throw new Error("Erreur inattendue lors de l'authentification.");
+      
+      // Essayer de récupérer le profil associé
+      const { data: profile, error: pErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .maybeSingle();
+      
+      if (pErr) handleAPIError(pErr, "Impossible de lire votre profil.");
+      if (!profile) {
+        console.error("[Profile Error] Auth user exists but profile table is empty for ID:", data.user.id);
+        throw new Error("Profil introuvable. Vérifiez que le Trigger SQL est bien installé dans Supabase.");
+      }
+      
       return mapProfile(profile);
     },
 
@@ -81,12 +86,13 @@ export const API = {
     },
 
     createUser: async (userData: any) => {
+      // Supabase Auth SignUp
       const { data, error } = await supabase.auth.signUp({
         email: userData.email.trim().toLowerCase(), 
         password: userData.password,
         options: { 
           data: { 
-            name: userData.name, 
+            name: userData.fullName, 
             role: userData.role, 
             className: userData.className, 
             school_name: userData.schoolName 
@@ -123,7 +129,6 @@ export const API = {
     }
   },
 
-  // Added grades service to resolve missing property error in Grades.tsx
   grades: {
     list: async (userId?: string): Promise<Grade[]> => {
       if (!userId) return [];
@@ -145,7 +150,6 @@ export const API = {
     }
   },
 
-  // Added messaging service to resolve missing property error in Messages.tsx
   messaging: {
     list: async (): Promise<DirectMessage[]> => {
       const user = await getAuthUser();
@@ -377,13 +381,13 @@ export const API = {
       return data.map(s => ({ 
         id: s.id, 
         day: s.day, 
-        startTime: s.start_time, 
-        endTime: s.end_time, 
+        start_time: s.start_time, 
+        end_time: s.end_time, 
         subject: s.subject, 
         teacher: s.teacher, 
         room: s.room, 
         color: s.color 
-      })) as ScheduleSlot[];
+      })) as any;
     },
     saveSlots: async (className: string, slots: ScheduleSlot[]) => {
       const user = await getAuthUser();
