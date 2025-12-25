@@ -1,0 +1,21 @@
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# Dependencies
+node_modules/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Vercel
+.vercel
+
+# Env
+.env
+.env*.local
