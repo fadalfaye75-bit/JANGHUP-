@@ -1,4 +1,5 @@
-import React, { lazy, Suspense, useEffect, ReactNode, Component } from 'react';
+
+import React, { lazy, Suspense, useEffect, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { NotificationProvider } from './context/NotificationContext.tsx';
@@ -14,10 +15,8 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-// Added constructor to explicitly initialize and type the component's state and props
-// Inheriting from Component<P, S> provides 'props' and 'state' to the class
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Explicitly defined state as a class property for better type safety and to resolve "Property 'state' does not exist" error
+// Fix: Use React.Component explicitly to ensure props are correctly inherited and recognized by the TypeScript compiler
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = {
     hasError: false,
     error: null
@@ -42,8 +41,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   };
   
   render() {
-    // Correctly accessing state property from the Component class
-    if (this.state.hasError) {
+    // Fix: Destructured props in render to ensure children is correctly accessed and typed
+    const { hasError } = this.state;
+    const { children } = this.props;
+
+    if (hasError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 p-6 text-center animate-fade-in">
           <div className="w-24 h-24 bg-red-50 text-red-500 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-xl shadow-red-500/10">
@@ -70,8 +72,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         </div>
       );
     }
-    // Correctly accessing props property from the Component class to return children
-    return this.props.children;
+    return children;
   }
 }
 
@@ -99,10 +100,13 @@ const LoadingFallback = () => (
   </div>
 );
 
-// Changed children to optional to satisfy compiler requirements when used in Route elements
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
   return <>{children}</>;
 };
 
