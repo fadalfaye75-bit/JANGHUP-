@@ -16,7 +16,6 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-// Fixed: Explicitly using React.Component ensures the 'props' property is correctly inherited and typed
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = {
     hasError: false,
@@ -83,8 +82,6 @@ const Meet = lazy(() => import('./pages/Meet.tsx'));
 const Polls = lazy(() => import('./pages/Polls.tsx'));
 const AdminPanel = lazy(() => import('./pages/AdminPanel.tsx'));
 const Profile = lazy(() => import('./pages/Profile.tsx'));
-const Grades = lazy(() => import('./pages/Grades.tsx'));
-const Messages = lazy(() => import('./pages/Messages.tsx'));
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -121,8 +118,6 @@ function AppRoutes() {
           <Route path="polls" element={<Polls />} />
           <Route path="profile" element={<Profile />} />
           <Route path="admin" element={<AdminPanel />} />
-          <Route path="grades" element={<Grades />} />
-          <Route path="messages" element={<Messages />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

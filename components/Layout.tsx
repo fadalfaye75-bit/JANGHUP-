@@ -6,7 +6,7 @@ import {
   BarChart2, Search, LogOut, Menu, Moon, Sun, 
   ShieldCheck, UserCircle, Bell, Check, School, 
   CheckCheck, Clock, BellRing, Settings,
-  ClipboardList, MailCheck, Inbox, MessageSquare
+  MailCheck, Inbox
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
@@ -104,16 +104,13 @@ export default function Layout() {
       { to: '/announcements', icon: Megaphone, label: 'Annonces' },
       { to: '/schedule', icon: Calendar, label: 'Planning' },
       { to: '/exams', icon: GraduationCap, label: 'Examens' },
-      { to: '/grades', icon: ClipboardList, label: 'Résultats' },
       { to: '/meet', icon: Video, label: 'Directs' },
-      { to: '/messages', icon: MessageSquare, label: 'Messagerie' },
       { to: '/polls', icon: BarChart2, label: 'Consultations' },
     ];
     if (user?.role === UserRole.ADMIN) items.push({ to: '/admin', icon: ShieldCheck, label: 'Administration' } as any);
     return items;
   }, [user?.role]);
 
-  // SRE: Handle race condition where user might be null during logout redirect
   if (!user) return null;
 
   return (

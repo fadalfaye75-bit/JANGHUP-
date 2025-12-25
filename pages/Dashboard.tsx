@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API } from '../services/api';
 import { Announcement, Exam, UserRole, Poll, MeetLink } from '../types';
@@ -8,7 +9,6 @@ import {
   Calendar, Video, Megaphone, Radio, Zap, ArrowRight, 
   TrendingUp, MapPin
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
 
 const SkeletonCard = () => (
   <div className="bg-white dark:bg-gray-900 p-8 rounded-[3rem] shadow-soft border border-gray-100 dark:border-gray-800 space-y-4">

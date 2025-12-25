@@ -123,6 +123,52 @@ export const API = {
     }
   },
 
+  // Added grades service to resolve missing property error in Grades.tsx
+  grades: {
+    list: async (userId?: string): Promise<Grade[]> => {
+      if (!userId) return [];
+      const { data, error } = await supabase.from('grades')
+        .select('*')
+        .eq('user_id', userId)
+        .order('semester', { ascending: true });
+      if (error) return [];
+      return (data || []).map(g => ({
+        id: g.id,
+        user_id: g.user_id,
+        subject: g.subject,
+        score: g.score,
+        maxScore: g.max_score,
+        coefficient: g.coefficient,
+        semester: g.semester,
+        comment: g.comment
+      }));
+    }
+  },
+
+  // Added messaging service to resolve missing property error in Messages.tsx
+  messaging: {
+    list: async (): Promise<DirectMessage[]> => {
+      const user = await getAuthUser();
+      const { data, error } = await supabase.from('direct_messages')
+        .select('*')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('timestamp', { ascending: false });
+      if (error) return [];
+      return data || [];
+    },
+    send: async (receiverId: string, content: string) => {
+      const user = await getAuthUser();
+      const { error } = await supabase.from('direct_messages').insert({
+        sender_id: user.id,
+        receiver_id: receiverId,
+        content: content,
+        timestamp: new Date().toISOString(),
+        is_read: false
+      });
+      if (error) handleAPIError(error, "Envoi du message impossible.");
+    }
+  },
+
   announcements: {
     list: async (page: number, size: number): Promise<Announcement[]> => {
       const { data, error } = await supabase.from('announcements')
@@ -170,7 +216,6 @@ export const API = {
     }
   },
 
-  /* Fixed: Added missing exams property to API object */
   exams: {
     list: async (): Promise<Exam[]> => {
       const { data, error } = await supabase.from('exams').select('*').order('date', { ascending: true });
@@ -261,7 +306,6 @@ export const API = {
       
       if (error) handleAPIError(error, "Création du sondage impossible.");
       
-      // SRE Fix: Variable 'opt' defined correctly
       const opts = poll.options.map((opt: any) => ({ poll_id: newPoll.id, label: opt.label }));
       await supabase.from('poll_options').insert(opts);
     },
@@ -343,7 +387,6 @@ export const API = {
     },
     saveSlots: async (className: string, slots: ScheduleSlot[]) => {
       const user = await getAuthUser();
-      // Atomic transaction: Delete then Insert
       await supabase.from('schedule_slots').delete().eq('classname', className);
       const toInsert = slots.map(s => ({ 
         day: s.day, 
@@ -431,56 +474,6 @@ export const API = {
   interactions: {
     incrementShare: async (table: string, id: string) => { 
       try { await supabase.rpc('increment_share_count', { target_table: table, target_id: id }); } catch (e) {}
-    }
-  },
-
-  grades: {
-    list: async (userId?: string): Promise<Grade[]> => {
-      if (!userId) return [];
-      const { data, error } = await supabase.from('grades')
-        .select('*')
-        .eq('user_id', userId)
-        .order('semester', { ascending: true });
-      if (error) return [];
-      return (data || []).map(g => ({
-        id: g.id,
-        user_id: g.user_id,
-        subject: g.subject,
-        score: g.score,
-        maxScore: g.max_score,
-        coefficient: g.coefficient,
-        semester: g.semester,
-        comment: g.comment
-      }));
-    }
-  },
-
-  messaging: {
-    list: async (): Promise<DirectMessage[]> => {
-      const user = await getAuthUser();
-      const { data, error } = await supabase.from('direct_messages')
-        .select('*')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('timestamp', { ascending: false });
-      if (error) return [];
-      return (data || []).map(m => ({
-        id: m.id,
-        sender_id: m.sender_id,
-        receiver_id: m.receiver_id,
-        content: m.content,
-        timestamp: m.timestamp,
-        is_read: m.is_read
-      }));
-    },
-    send: async (receiverId: string, content: string) => {
-      const user = await getAuthUser();
-      const { error } = await supabase.from('direct_messages').insert({
-        sender_id: user.id,
-        receiver_id: receiverId,
-        content,
-        timestamp: new Date().toISOString()
-      });
-      if (error) handleAPIError(error, "Envoi du message échoué.");
     }
   },
 

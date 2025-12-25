@@ -134,7 +134,7 @@ export interface ActivityLog {
   timestamp: string;
 }
 
-// Added Grade interface to resolve error in Grades.tsx
+// Added Grade interface to fix missing exported member error
 export interface Grade {
   id: string;
   user_id: string;
@@ -146,7 +146,7 @@ export interface Grade {
   comment?: string;
 }
 
-// Added DirectMessage interface to resolve error in Messages.tsx
+// Added DirectMessage interface to fix missing exported member error
 export interface DirectMessage {
   id: string;
   sender_id: string;
