@@ -54,25 +54,29 @@ export default function Dashboard() {
       };
 
       setData({
-        anns: allAnns.filter(a => filterByAccess(a.className)).slice(0, 3),
-        exams: allExams.filter(e => filterByAccess(e.className) && new Date(e.date) >= new Date()).slice(0, 2),
-        polls: allPolls.filter(p => filterByAccess(p.className) && p.isActive).slice(0, 1),
-        meets: allMeets.filter(m => filterByAccess(m.className)).slice(0, 1)
+        anns: (allAnns || []).filter(a => filterByAccess(a.className)).slice(0, 3),
+        exams: (allExams || []).filter(e => filterByAccess(e.className) && new Date(e.date) >= new Date()).slice(0, 2),
+        polls: (allPolls || []).filter(p => filterByAccess(p.className) && p.isActive).slice(0, 1),
+        meets: (allMeets || []).filter(m => filterByAccess(m.className)).slice(0, 1)
       });
     } catch (error) {
       console.error("[Dashboard] Sync Issue", error);
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  }, [user, adminViewClass]);
+  }, [user?.role, user?.className, adminViewClass]);
 
   useEffect(() => {
     isMounted.current = true;
     fetchData();
+    
     const sub = API.announcements.subscribe(() => fetchData(true));
+    
     return () => { 
       isMounted.current = false;
-      sub.unsubscribe(); 
+      if (sub && typeof sub.unsubscribe === 'function') {
+        sub.unsubscribe();
+      }
     };
   }, [fetchData]);
 
@@ -94,7 +98,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-12 max-w-7xl mx-auto animate-fade-in pb-32">
-      {/* Hero Section */}
       <div className="relative group">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-10">
           <div className="space-y-6">
@@ -110,7 +113,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
         {metrics.map((m) => (
           <Link key={m.to} to={m.to} className="bg-white dark:bg-gray-900 p-8 rounded-[3rem] shadow-soft border border-gray-100 dark:border-gray-800 hover:scale-105 transition-all group overflow-hidden relative">
@@ -124,9 +126,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-12 items-start">
-        {/* News Column */}
         <div className="lg:col-span-2 space-y-8">
            <div className="flex items-center justify-between px-6">
               <h3 className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-[0.4em] flex items-center gap-3 italic">
@@ -153,7 +153,6 @@ export default function Dashboard() {
            </div>
         </div>
 
-        {/* Sidebar Column */}
         <div className="space-y-12">
            <div className="bg-gray-900 dark:bg-black rounded-[4rem] p-10 text-white shadow-premium relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 -mr-16 -mt-16 rounded-full group-hover:scale-150 transition-transform duration-1000" />

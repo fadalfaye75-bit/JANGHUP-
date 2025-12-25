@@ -1,5 +1,4 @@
-
-import React, { lazy, Suspense, useEffect, ReactNode } from 'react';
+import React, { Component, lazy, Suspense, useEffect, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { NotificationProvider } from './context/NotificationContext.tsx';
@@ -15,16 +14,12 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-// Fix: Use React.Component explicitly to ensure props are correctly inherited and recognized by the TypeScript compiler
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Use explicitly imported Component and ensure children is accessed correctly via this.props
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = {
     hasError: false,
     error: null
   };
-
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-  }
   
   static getDerivedStateFromError(error: Error) { 
     return { hasError: true, error }; 
@@ -41,7 +36,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   };
   
   render() {
-    // Fix: Destructured props in render to ensure children is correctly accessed and typed
+    // Destructuring state and props to ensure clean access
     const { hasError } = this.state;
     const { children } = this.props;
 
