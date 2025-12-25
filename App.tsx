@@ -1,38 +1,37 @@
 
-import React, { lazy, Suspense, useEffect, Component, ReactNode } from 'react';
+import React, { lazy, Suspense, useEffect, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { NotificationProvider } from './context/NotificationContext.tsx';
 import { ChatProvider } from './context/ChatContext.tsx';
 import { Loader2, AlertCircle, RefreshCcw } from 'lucide-react';
 
-// Fix: Make children optional in the props interface to resolve the error on line 89 when the component is used in JSX.
 interface ErrorBoundaryProps { children?: ReactNode; }
 interface ErrorBoundaryState { hasError: boolean; }
 
-// Fix: Use React.Component specifically to ensure state and props properties are recognized by TypeScript as being part of the class instance.
 class RootErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Explicitly declaring state to fix component property errors
+  state: ErrorBoundaryState = { hasError: false };
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    // Fix: Initializing state inherited from React.Component.
     this.state = { hasError: false };
   }
   static getDerivedStateFromError() { return { hasError: true }; }
   render() {
-    // Fix: Accessing state inherited from React.Component.
+    // Accessing state and props via 'this'
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
-          <AlertCircle size={48} className="text-red-500 mb-4" />
-          <h1 className="text-2xl font-black uppercase italic mb-2">Erreur Système</h1>
-          <p className="text-gray-500 mb-8 max-w-xs text-sm">Une erreur critique a interrompu JangHup.</p>
-          <button onClick={() => window.location.reload()} className="px-8 py-4 bg-gray-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2">
-            <RefreshCcw size={16} /> Redémarrer
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 p-6 text-center">
+          <AlertCircle size={64} className="text-red-500 mb-6" />
+          <h1 className="text-2xl font-black uppercase italic mb-2 dark:text-white">Système Interrompu</h1>
+          <p className="text-gray-500 mb-8 max-w-xs text-sm">Une erreur critique a été détectée sur JangHup.</p>
+          <button onClick={() => window.location.reload()} className="px-10 py-5 bg-gray-900 text-white rounded-[2rem] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 shadow-xl active:scale-95 transition-all">
+            <RefreshCcw size={18} /> Redémarrer le Portail
           </button>
         </div>
       );
     }
-    // Fix: Accessing props inherited from React.Component.
     return this.props.children;
   }
 }
@@ -55,9 +54,9 @@ const ScrollToTop = () => {
 };
 
 const LoadingFallback = () => (
-  <div className="flex flex-col items-center justify-center min-h-[60vh] w-full">
-    <Loader2 className="animate-spin text-primary-500 mb-6" size={40} />
-    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest animate-pulse">Liaison JangHup...</p>
+  <div className="flex flex-col items-center justify-center min-h-[60vh] w-full bg-transparent">
+    <Loader2 className="animate-spin text-primary-500 mb-6" size={48} />
+    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest animate-pulse">Synchronisation JangHup...</p>
   </div>
 );
 

@@ -5,11 +5,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>JangHup - Portail Universitaire Officiel</title>
-    <meta name="description" content="Plateforme de gestion centralisée pour l'ESP Dakar. Connecte administration, délégués et étudiants.">
+    <meta name="description" content="Plateforme de gestion centralisée pour l'ESP Dakar.">
     <meta name="theme-color" content="#0ea5e9">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="author" content="JangHup Core Team">
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -32,7 +29,6 @@
             boxShadow: {
               'soft': '0 20px 40px -15px rgba(0, 0, 0, 0.05)',
               'premium': '0 30px 60px -15px rgba(0, 0, 0, 0.15)',
-              'inner-soft': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.05)',
             }
           }
         }
@@ -62,45 +58,16 @@
       * { transition: background-color 0.2s ease, border-color 0.2s ease; outline: none !important; -webkit-tap-highlight-color: transparent; }
       body { background-color: #f8fafc; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
       .dark body { background-color: #020617; }
-      
-      /* Loader initial ultra-fluide */
-      #app-init-loader { 
-        position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; 
-        background: #ffffff; z-index: 9999; transition: opacity 0.5s ease, visibility 0.5s;
-      }
+      #app-init-loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; z-index: 9999; }
       .dark #app-init-loader { background: #020617; }
-      .spinner-v2 { 
-        width: 48px; height: 48px; border: 4px solid #f1f5f9; border-top: 4px solid #0ea5e9; 
-        border-radius: 50%; animation: spin 0.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; 
-      }
+      .spinner-v2 { width: 48px; height: 48px; border: 4px solid #f1f5f9; border-top: 4px solid #0ea5e9; border-radius: 50%; animation: spin 0.6s linear infinite; }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
-      @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-      
-      /* Scrollbar Custom */
-      .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-      .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-      .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
   </head>
   <body>
-    <div id="app-init-loader">
-      <div class="spinner-v2"></div>
-      <p style="margin-top: 24px; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.3em; font-style: italic;">Lancement JangHup...</p>
-    </div>
-    
     <div id="root"></div>
-    
-    <script type="module">
-      window.addEventListener('load', () => {
-        const loader = document.getElementById('app-init-loader');
-        if (loader) {
-          loader.style.opacity = '0';
-          loader.style.visibility = 'hidden';
-        }
-      });
-    </script>
     <script type="module" src="./index.tsx"></script>
   </body>
 </html>
