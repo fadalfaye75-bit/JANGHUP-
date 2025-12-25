@@ -222,7 +222,17 @@ export const API = {
     getSlots: async (className: string): Promise<ScheduleSlot[]> => {
       const { data, error } = await supabase.from('schedule_slots').select('*').or(`classname.eq.${className},classname.eq.Général`);
       if (error) return [];
-      return data.map(s => ({ id: s.id, day: s.day, start_time: s.start_time, end_time: s.end_time, subject: s.subject, teacher: s.teacher, room: s.room, color: s.color }));
+      // Correction du mapping pour correspondre à l'interface ScheduleSlot (CamelCase)
+      return data.map(s => ({ 
+        id: s.id, 
+        day: s.day, 
+        startTime: s.start_time, 
+        endTime: s.end_time, 
+        subject: s.subject, 
+        teacher: s.teacher, 
+        room: s.room, 
+        color: s.color 
+      }));
     },
     saveSlots: async (className: string, slots: ScheduleSlot[]) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -249,7 +259,7 @@ export const API = {
       if (error) handleAPIError(error, "Création Meet échouée");
     },
     update: async (id: string, meet: any) => {
-      const { error } = await supabase.from('meet_links').update({ title: meet.title, platform: meet.platform, url: meet.url, time: meet.time, classname: meet.className }).eq('id', id);
+      const { error = null } = await supabase.from('meet_links').update({ title: meet.title, platform: meet.platform, url: meet.url, time: meet.time, classname: meet.className }).eq('id', id);
       if (error) handleAPIError(error, "Modification Meet échouée");
     },
     delete: async (id: string) => {
@@ -280,7 +290,6 @@ export const API = {
     }
   },
 
-  // Added grades service to resolve error in Grades.tsx
   grades: {
     list: async (userId?: string): Promise<Grade[]> => {
       const { data, error } = await supabase.from('grades').select('*').eq('user_id', userId).order('semester', { ascending: true });
@@ -298,7 +307,6 @@ export const API = {
     }
   },
 
-  // Added messaging service to resolve error in Messages.tsx
   messaging: {
     list: async (): Promise<DirectMessage[]> => {
       const { data: { user } } = await supabase.auth.getUser();
