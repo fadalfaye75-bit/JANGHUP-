@@ -1,5 +1,4 @@
-
-import React, { lazy, Suspense, useEffect, ReactNode } from 'react';
+import React, { lazy, Suspense, useEffect, ReactNode, Component } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { NotificationProvider } from './context/NotificationContext.tsx';
@@ -16,13 +15,16 @@ interface ErrorBoundaryState {
 }
 
 // Added constructor to explicitly initialize and type the component's state and props
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Inheriting from Component<P, S> provides 'props' and 'state' to the class
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Explicitly defined state as a class property for better type safety and to resolve "Property 'state' does not exist" error
+  state: ErrorBoundaryState = {
+    hasError: false,
+    error: null
+  };
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = {
-      hasError: false,
-      error: null
-    };
   }
   
   static getDerivedStateFromError(error: Error) { 
@@ -40,6 +42,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   };
   
   render() {
+    // Correctly accessing state property from the Component class
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 p-6 text-center animate-fade-in">
@@ -67,7 +70,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         </div>
       );
     }
-    // Fixed direct props access
+    // Correctly accessing props property from the Component class to return children
     return this.props.children;
   }
 }
