@@ -35,7 +35,6 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- C. Activer la lecture des résultats (Indispensable pour l'affichage des %)
--- Sans ces lignes, le frontend ne peut pas lire le nombre de votes des options (donc 0%)
 ALTER TABLE public.poll_options ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Lecture des options" ON public.poll_options;
 CREATE POLICY "Lecture des options" ON public.poll_options FOR SELECT TO authenticated USING (true);
@@ -47,6 +46,8 @@ CREATE POLICY "Lecture des votes" ON public.poll_votes FOR SELECT TO authenticat
 
 ## 🏢 2. Configuration des Classes (Emails de partage)
 
+**Indispensable pour que le bouton "Partager par mail" fonctionne dans tous les onglets (Annonces, Examens, Directs, Sondages).**
+
 ```sql
 -- 1. S'assurer que la table classes possède la colonne email
 ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS email text;
@@ -54,15 +55,16 @@ ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS email text;
 -- 2. Activer RLS sur la table classes
 ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
 
--- 3. Politique : Tout utilisateur authentifié peut lire les classes
+-- 3. Politique : Tout utilisateur authentifié peut lire les classes (pour récupérer les mails de diffusion)
 DROP POLICY IF EXISTS "Lecture publique des classes" ON public.classes;
 CREATE POLICY "Lecture publique des classes" 
 ON public.classes FOR SELECT 
 TO authenticated 
 USING (true);
 
--- 4. Exemple de mise à jour des emails de filières
-UPDATE public.classes SET email = 'delegue.dsti@esp.sn' WHERE name ILIKE '%DSTI%';
+-- 4. Exemple de mise à jour des emails de filières (A adapter selon vos besoins)
+-- UPDATE public.classes SET email = 'informatique.l3@esp.sn' WHERE name = 'L3 Informatique';
+-- UPDATE public.classes SET email = 'genie.civil@esp.sn' WHERE name = 'Génie Civil';
 ```
 
 ## 🛠️ 3. Structure des Partages
@@ -72,6 +74,7 @@ UPDATE public.classes SET email = 'delegue.dsti@esp.sn' WHERE name ILIKE '%DSTI%
 ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS share_count int4 DEFAULT 0;
 ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS share_count int4 DEFAULT 0;
 ALTER TABLE public.polls ADD COLUMN IF NOT EXISTS share_count int4 DEFAULT 0;
+ALTER TABLE public.meet_links ADD COLUMN IF NOT EXISTS share_count int4 DEFAULT 0;
 
 -- Fonction d'incrémentation universelle
 CREATE OR REPLACE FUNCTION increment_share_count(target_table text, target_id uuid)

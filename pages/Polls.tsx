@@ -85,6 +85,29 @@ export default function Polls() {
     }
   };
 
+  const handleShareEmail = (poll: Poll) => {
+    try {
+      const targetClass = classes.find(c => c.name === poll.className);
+      const recipient = targetClass?.email || '';
+      const className = poll.className || 'Filière';
+      
+      const subject = `[JangHup – ${className}] Consultation : ${poll.question}`;
+      let optionsText = poll.options
+        .map(o => {
+          const p = poll.totalVotes > 0 ? Math.round((o.votes / poll.totalVotes) * 100) : 0;
+          return `🔹 ${o.label} : ${p}% (${o.votes} voix)`;
+        })
+        .join('\n');
+
+      const body = `🔵 JangHup – ${className}\n\n📊 CONSULTATION : ${poll.question.toUpperCase()}\n\n${optionsText}\n\n👥 Total de participations : ${poll.totalVotes}\n\n🗳️ Voter sur JangHup : https://janghup.app/#/polls\n\n—\nPlateforme JangHup\nCommunication académique officielle`;
+      
+      window.location.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      API.interactions.incrementShare('polls', poll.id).catch(() => {});
+    } catch (e) {
+      console.error("Email share failed", e);
+    }
+  };
+
   const handleVote = async (pollId: string, optionId: string, currentVoteId?: string) => {
     if (currentVoteId === optionId) return;
     if (!user || votingPollId) return;
@@ -246,7 +269,6 @@ export default function Polls() {
 
           return (
             <div key={poll.id} className={`group bg-white dark:bg-gray-900 rounded-[4rem] p-10 md:p-14 shadow-soft border-2 transition-all duration-500 flex flex-col relative ${poll.isActive ? 'border-transparent hover:border-primary-100' : 'border-gray-50 opacity-90'}`}>
-               {/* Indicateur de chargement discret sur le côté */}
                {isVotingThisPoll && (
                  <div className="absolute top-10 right-10 flex items-center gap-2 bg-white/90 dark:bg-gray-800/90 backdrop-blur p-2 rounded-full shadow-lg z-30 animate-in fade-in zoom-in">
                     <Loader2 className="animate-spin text-primary-500" size={16} />
@@ -281,6 +303,9 @@ export default function Polls() {
                      <button onClick={() => handleShareWhatsApp(poll)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm active:scale-95" title="Partager WhatsApp">
                         <Share2 size={20} />
                      </button>
+                     <button onClick={() => handleShareEmail(poll)} className="p-4 bg-gray-900 text-white rounded-2xl hover:bg-black transition-all shadow-sm active:scale-95" title="Partager par Email">
+                        <Mail size={20} />
+                     </button>
                   </div>
                </div>
 
@@ -303,7 +328,6 @@ export default function Polls() {
                                 : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 hover:border-primary-400'
                               } ${!poll.isActive ? 'cursor-default' : 'active:scale-[0.98]'} ${isJustVoted ? 'vote-vibrate' : ''}`}
                             >
-                               {/* Barre de progression raffinée avec transition lisse */}
                                {showResults && (
                                  <div 
                                    className={`absolute left-0 top-0 bottom-0 opacity-10 transition-all duration-1000 cubic-bezier(0.4, 0, 0.2, 1) ${isSelected ? 'bg-white' : 'bg-primary-500'}`}

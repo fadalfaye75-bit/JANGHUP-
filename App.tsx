@@ -7,13 +7,18 @@ import { ChatProvider } from './context/ChatContext.tsx';
 import { Loader2, RefreshCcw, AlertTriangle } from 'lucide-react';
 import { UserRole } from './types.ts';
 
-class ErrorBoundary extends React.Component<{children: ReactNode}, {hasError: boolean, error: Error | null}> {
-  constructor(props: {children: ReactNode}) {
-    super(props);
-    this.state = { hasError: false, error: null };
+// Fix for ErrorBoundary property 'state' and 'props' not found errors and missing 'children' prop error by using class property initialization and optional children prop.
+class ErrorBoundary extends React.Component<{ children?: ReactNode }, { hasError: boolean; error: Error | null }> {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
   }
-  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
-  componentDidCatch(error: Error, errorInfo: any) { console.error("JangHup Error caught", error, errorInfo); }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("JangHup Error caught", error, errorInfo);
+  }
+
   render() {
     if (this.state.hasError) {
       return (
