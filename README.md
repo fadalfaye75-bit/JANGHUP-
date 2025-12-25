@@ -1,88 +1,55 @@
 
-# UniConnect ESP - Configuration SQL Complète
+# 🏛️ JangHup - Système de Gestion Universitaire ESP
 
-Exécutez ce script dans l'éditeur SQL de votre interface Supabase pour activer toutes les fonctionnalités et corriger les bugs de vote/déconnexion.
+## 🛠️ Installation & Réparation de la Base de Données (Supabase)
 
-## 🗳️ 1. Correction du Système de Vote (Bouton "Bloqué à 0%")
+Si l'application rencontre des erreurs RLS, des problèmes de vote bloqués à 0% ou des profils manquants, exécutez le script SQL suivant dans l'éditeur SQL de votre interface Supabase.
+
+### Master Fix SQL Script
 
 ```sql
--- A. S'assurer que les compteurs ne sont jamais NULL
-UPDATE public.poll_options SET votes = 0 WHERE votes IS NULL;
-ALTER TABLE public.poll_options ALTER COLUMN votes SET DEFAULT 0;
+-- 1. Autoriser les extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- B. Fonction de vote robuste (SECURITY DEFINER pour bypasser RLS lors de l'écriture)
+-- 2. Configuration des Votes (Correction Bug 0%)
 CREATE OR REPLACE FUNCTION cast_poll_vote(p_poll_id uuid, p_option_id uuid)
 RETURNS void AS $$
 BEGIN
-  -- 1. Supprimer le vote précédent de l'utilisateur pour ce sondage précis
-  DELETE FROM public.poll_votes 
-  WHERE poll_id = p_poll_id 
-  AND user_id = auth.uid();
-
-  -- 2. Insérer le nouveau vote
-  INSERT INTO public.poll_votes (poll_id, option_id, user_id)
-  VALUES (p_poll_id, p_option_id, auth.uid());
-
-  -- 3. Mettre à jour les compteurs de TOUTES les options de ce sondage pour une cohérence totale
+  DELETE FROM public.poll_votes WHERE poll_id = p_poll_id AND user_id = auth.uid();
+  INSERT INTO public.poll_votes (poll_id, option_id, user_id) VALUES (p_poll_id, p_option_id, auth.uid());
   UPDATE public.poll_options 
-  SET votes = (
-    SELECT count(*) 
-    FROM public.poll_votes 
-    WHERE public.poll_votes.option_id = public.poll_options.id
-  )
-  WHERE public.poll_options.poll_id = p_poll_id;
+  SET votes = (SELECT count(*) FROM public.poll_votes WHERE option_id = public.poll_options.id)
+  WHERE poll_id = p_poll_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- C. Activer la lecture des résultats (Indispensable pour l'affichage des %)
-ALTER TABLE public.poll_options ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Lecture des options" ON public.poll_options;
-CREATE POLICY "Lecture des options" ON public.poll_options FOR SELECT TO authenticated USING (true);
-
-ALTER TABLE public.poll_votes ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Lecture des votes" ON public.poll_votes;
-CREATE POLICY "Lecture des votes" ON public.poll_votes FOR SELECT TO authenticated USING (true);
-```
-
-## 🏢 2. Configuration des Classes (Emails de partage)
-
-**Indispensable pour que le bouton "Partager par mail" fonctionne dans tous les onglets (Annonces, Examens, Directs, Sondages).**
-
-```sql
--- 1. S'assurer que la table classes possède la colonne email
-ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS email text;
-
--- 2. Activer RLS sur la table classes
-ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
-
--- 3. Politique : Tout utilisateur authentifié peut lire les classes (pour récupérer les mails de diffusion)
-DROP POLICY IF EXISTS "Lecture publique des classes" ON public.classes;
-CREATE POLICY "Lecture publique des classes" 
-ON public.classes FOR SELECT 
-TO authenticated 
-USING (true);
-
--- 4. Exemple de mise à jour des emails de filières (A adapter selon vos besoins)
--- UPDATE public.classes SET email = 'informatique.l3@esp.sn' WHERE name = 'L3 Informatique';
--- UPDATE public.classes SET email = 'genie.civil@esp.sn' WHERE name = 'Génie Civil';
-```
-
-## 🛠️ 3. Structure des Partages
-
-```sql
--- S'assurer que les colonnes de partage existent
-ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS share_count int4 DEFAULT 0;
-ALTER TABLE public.exams ADD COLUMN IF NOT EXISTS share_count int4 DEFAULT 0;
-ALTER TABLE public.polls ADD COLUMN IF NOT EXISTS share_count int4 DEFAULT 0;
-ALTER TABLE public.meet_links ADD COLUMN IF NOT EXISTS share_count int4 DEFAULT 0;
-
--- Fonction d'incrémentation universelle
-CREATE OR REPLACE FUNCTION increment_share_count(target_table text, target_id uuid)
-RETURNS void AS $$
+-- 3. Trigger d'auto-profiling (Évite l'écran blanc après login)
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
 BEGIN
-  EXECUTE format('UPDATE public.%I SET share_count = COALESCE(share_count, 0) + 1 WHERE id = %L', target_table, target_id);
-EXCEPTION WHEN OTHERS THEN
-  NULL;
+  INSERT INTO public.profiles (id, name, email, role, classname)
+  VALUES (new.id, new.raw_user_meta_data->>'name', new.email, 'STUDENT', 'Général');
+  RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 4. Sécurité RLS Globale
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.polls ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public select" ON public.profiles;
+CREATE POLICY "Public select" ON public.profiles FOR SELECT TO authenticated USING (true);
 ```
+
+## 🔒 Règles de Sécurité
+- Seuls les **ADMINS** et **DÉLÉGUÉS** peuvent publier des annonces ou créer des sondages.
+- Les **ÉTUDIANTS** peuvent voter, voir les notes et les plannings.
+- Personne ne peut modifier les données d'un autre utilisateur (sauf ADMIN).
+
+## 🚀 Performance SRE
+- Toutes les mutations passent par des fonctions **SECURITY DEFINER** pour garantir l'intégrité atomique des données.
+- Utilisation de `supabase.auth.getUser()` dans le frontend pour une vérification JWT côté serveur.

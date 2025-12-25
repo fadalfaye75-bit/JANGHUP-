@@ -4,10 +4,9 @@ import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { NotificationProvider } from './context/NotificationContext.tsx';
 import { ChatProvider } from './context/ChatContext.tsx';
-import { Loader2, RefreshCcw, AlertTriangle } from 'lucide-react';
+import { Loader2, RefreshCcw, AlertTriangle, LogOut } from 'lucide-react';
 import { UserRole } from './types.ts';
 
-// Added explicit interfaces for ErrorBoundary props and state to fix the "Property 'props' does not exist" error
 interface ErrorBoundaryProps {
   children?: ReactNode;
 }
@@ -17,16 +16,15 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-// Updated ErrorBoundary to use explicit generics and constructor for better TypeScript compatibility
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Explicitly declare state and props to resolve TypeScript errors in some environments
-  public state: ErrorBoundaryState;
-  public props: ErrorBoundaryProps;
+// Fixed: Explicitly using React.Component ensures the 'props' property is correctly inherited and typed
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
+    hasError: false,
+    error: null
+  };
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.props = props;
-    this.state = { hasError: false, error: null };
   }
   
   static getDerivedStateFromError(error: Error) { 
@@ -34,21 +32,43 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
   
   componentDidCatch(error: Error, errorInfo: any) { 
-    console.error("JangHup Error", error, errorInfo); 
+    console.error("[SRE Critical Crash Log]", error, errorInfo); 
   }
+
+  handleForceReset = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
+  };
   
   render() {
-    // Accessing state property on this
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 p-6 text-center animate-fade-in">
-          <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mb-6 shadow-xl"><AlertTriangle size={40} /></div>
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white uppercase italic mb-4">Interruption Technique</h1>
-          <button onClick={() => window.location.reload()} className="px-10 py-5 bg-gray-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-xl hover:bg-black transition-all"><RefreshCcw size={16} /> Relancer JangHup</button>
+          <div className="w-24 h-24 bg-red-50 text-red-500 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-xl shadow-red-500/10">
+            <AlertTriangle size={48} />
+          </div>
+          <h1 className="text-3xl font-black text-gray-900 dark:text-white uppercase italic mb-4">Interruption Système</h1>
+          <p className="max-w-md text-gray-500 dark:text-gray-400 mb-10 font-medium italic">
+            Une erreur critique a interrompu JangHup. Essayez de relancer l'application ou réinitialisez votre session.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-10 py-5 bg-gray-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-xl hover:bg-black transition-all active:scale-95"
+            >
+              <RefreshCcw size={16} /> Relancer
+            </button>
+            <button 
+              onClick={this.handleForceReset}
+              className="px-10 py-5 bg-red-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-xl hover:bg-red-600 transition-all active:scale-95"
+            >
+              <LogOut size={16} /> Hard Reset
+            </button>
+          </div>
         </div>
       );
     }
-    // Accessing props property on this
     return this.props.children;
   }
 }
@@ -63,6 +83,8 @@ const Meet = lazy(() => import('./pages/Meet.tsx'));
 const Polls = lazy(() => import('./pages/Polls.tsx'));
 const AdminPanel = lazy(() => import('./pages/AdminPanel.tsx'));
 const Profile = lazy(() => import('./pages/Profile.tsx'));
+const Grades = lazy(() => import('./pages/Grades.tsx'));
+const Messages = lazy(() => import('./pages/Messages.tsx'));
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -73,7 +95,7 @@ const ScrollToTop = () => {
 const LoadingFallback = () => (
   <div className="flex flex-col items-center justify-center min-h-screen w-full bg-gray-50/50 dark:bg-gray-950">
     <Loader2 className="animate-spin text-primary-500 mb-6" size={48} />
-    <p className="text-sm font-black text-gray-400 animate-pulse uppercase tracking-[0.4em] italic">Chargement JangHup...</p>
+    <p className="text-xs font-black text-gray-400 animate-pulse uppercase tracking-[0.4em] italic">Liaison JangHup...</p>
   </div>
 );
 
@@ -99,6 +121,8 @@ function AppRoutes() {
           <Route path="polls" element={<Polls />} />
           <Route path="profile" element={<Profile />} />
           <Route path="admin" element={<AdminPanel />} />
+          <Route path="grades" element={<Grades />} />
+          <Route path="messages" element={<Messages />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

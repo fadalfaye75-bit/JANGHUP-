@@ -6,7 +6,7 @@ import {
   BarChart2, Search, LogOut, Menu, Moon, Sun, 
   ShieldCheck, UserCircle, Bell, Check, School, 
   CheckCheck, Clock, BellRing, Settings,
-  ClipboardList, MailCheck, Inbox
+  ClipboardList, MailCheck, Inbox, MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
@@ -16,8 +16,8 @@ import { UserRole } from '../types';
 export const UserAvatar = React.memo(({ name, color, className = "w-10 h-10", textClassName = "text-xs" }: { name: string, color?: string, className?: string, textClassName?: string }) => {
   const initials = useMemo(() => {
     if (!name) return "?";
-    const parts = name.split(' ');
-    if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
+    const parts = name.trim().split(' ');
+    if (parts.length > 1) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     return name.slice(0, 2).toUpperCase();
   }, [name]);
 
@@ -35,7 +35,7 @@ export const UserAvatar = React.memo(({ name, color, className = "w-10 h-10", te
 
 export default function Layout() {
   const { user, logout, toggleTheme, isDarkMode } = useAuth();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, clearNotifications, permission, requestPermission } = useNotification();
+  const { notifications, unreadCount, markAllAsRead, clearNotifications } = useNotification();
   
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isNotifOpen, setNotifOpen] = useState(false);
@@ -68,7 +68,7 @@ export default function Layout() {
   }, [location]);
 
   const prefetchSearchData = useCallback(async () => {
-    if (isDataLoaded) return;
+    if (isDataLoaded || !user) return;
     try {
       const [anns, exams, schs] = await Promise.all([
         API.announcements.list(0, 100),
@@ -77,8 +77,10 @@ export default function Layout() {
       ]);
       setAllData({ anns, exams, schs });
       setIsDataLoaded(true);
-    } catch (e) { console.error(e); }
-  }, [isDataLoaded]);
+    } catch (e) { 
+      console.warn("[Search Prefetch] Skipped - Auth transition."); 
+    }
+  }, [isDataLoaded, user]);
 
   const searchResults = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
@@ -100,21 +102,19 @@ export default function Layout() {
     const items = [
       { to: '/', icon: LayoutDashboard, label: 'Tableau de Bord', end: true },
       { to: '/announcements', icon: Megaphone, label: 'Annonces' },
-      { to: '/schedule', icon: Calendar, label: 'Planning & Cours' },
+      { to: '/schedule', icon: Calendar, label: 'Planning' },
       { to: '/exams', icon: GraduationCap, label: 'Examens' },
+      { to: '/grades', icon: ClipboardList, label: 'Résultats' },
       { to: '/meet', icon: Video, label: 'Directs' },
+      { to: '/messages', icon: MessageSquare, label: 'Messagerie' },
       { to: '/polls', icon: BarChart2, label: 'Consultations' },
-      { to: '/profile', icon: UserCircle, label: 'Profil' },
     ];
     if (user?.role === UserRole.ADMIN) items.push({ to: '/admin', icon: ShieldCheck, label: 'Administration' } as any);
     return items;
   }, [user?.role]);
 
-  const handleLogout = useCallback(async () => {
-    if (window.confirm("Voulez-vous vraiment quitter le portail JangHup ?")) {
-      await logout();
-    }
-  }, [logout]);
+  // SRE: Handle race condition where user might be null during logout redirect
+  if (!user) return null;
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-200 font-sans overflow-hidden">
@@ -161,7 +161,7 @@ export default function Layout() {
 
         <div className="p-6">
           <button 
-            onClick={handleLogout} 
+            onClick={() => { if(window.confirm("Quitter le portail ?")) logout(); }} 
             className="flex items-center gap-3 w-full px-5 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-red-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-900 rounded-2xl transition-all italic active:scale-95 border border-red-50 dark:border-red-900/30"
           >
             <LogOut size={18} /> Déconnexion
@@ -192,9 +192,9 @@ export default function Layout() {
                      <div className="p-4 border-b border-gray-50 dark:border-gray-800">
                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-2">Annonces</p>
                        {searchResults.announcements.map(a => (
-                         <NavLink key={a.id} to="/announcements" className="block p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors">
+                         <div key={a.id} onClick={() => { navigate('/announcements'); setIsSearchOpen(false); }} className="block p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors cursor-pointer">
                             <p className="text-sm font-bold italic text-gray-900 dark:text-white">{a.title}</p>
-                         </NavLink>
+                         </div>
                        ))}
                      </div>
                    )}
@@ -202,9 +202,9 @@ export default function Layout() {
                      <div className="p-4 border-b border-gray-50 dark:border-gray-800">
                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-2">Examens</p>
                        {searchResults.exams.map(e => (
-                         <NavLink key={e.id} to="/exams" className="block p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors">
+                         <div key={e.id} onClick={() => { navigate('/exams'); setIsSearchOpen(false); }} className="block p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors cursor-pointer">
                             <p className="text-sm font-bold italic text-gray-900 dark:text-white">{e.subject}</p>
-                         </NavLink>
+                         </div>
                        ))}
                      </div>
                    )}
@@ -222,8 +222,8 @@ export default function Layout() {
                 {isNotifOpen && (
                   <div className="absolute top-full right-0 mt-3 w-80 bg-white dark:bg-gray-900 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in slide-in-from-top-2">
                     <div className="p-6 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center">
-                       <h4 className="text-xs font-black uppercase tracking-widest italic">Notifications</h4>
-                       <button onClick={() => clearNotifications()} className="text-[9px] font-black text-gray-400 hover:text-red-500 uppercase tracking-widest">Tout effacer</button>
+                       <h4 className="text-xs font-black uppercase tracking-widest italic">Alertes</h4>
+                       <button onClick={() => clearNotifications()} className="text-[9px] font-black text-gray-400 hover:text-red-500 uppercase tracking-widest">Purger</button>
                     </div>
                     <div className="max-h-[60vh] overflow-y-auto">
                        {notifications.length > 0 ? notifications.map(n => (
@@ -232,7 +232,7 @@ export default function Layout() {
                             <p className="text-[9px] text-gray-400 font-bold mt-1 line-clamp-2">{n.message}</p>
                          </div>
                        )) : (
-                         <div className="p-10 text-center opacity-30 grayscale"><BellRing size={40} className="mx-auto mb-4" /><p className="text-[10px] font-black uppercase tracking-widest">Aucune alerte</p></div>
+                         <div className="p-10 text-center opacity-30 grayscale"><BellRing size={40} className="mx-auto mb-4" /><p className="text-[10px] font-black uppercase tracking-widest">Aucun signal</p></div>
                        )}
                     </div>
                   </div>

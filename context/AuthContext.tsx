@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { User } from '../types';
 import { API } from '../services/api';
 import { supabase } from '../services/supabaseClient';
@@ -24,38 +24,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const initAuth = useCallback(async () => {
+    try {
+      setLoading(true);
+      // SRE CRITICAL: Always use getUser() which verifies JWT with the server.
+      // getSession() only reads from local storage and can be faked or expired.
+      const profile = await API.auth.getSession();
+      setUser(profile);
+    } catch (e) {
+      console.error("[SRE Auth Audit] Initialization failed:", e);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     // Theme initialization
     const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
+    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       setIsDarkMode(true);
       document.documentElement.classList.add('dark');
     }
 
-    const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          const profile = await API.auth.getSession();
-          setUser(profile);
-        } else {
-          setUser(null);
-        }
-      } catch (e) {
-        console.error("Auth initialization failed", e);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     initAuth();
 
-    // Listen for auth changes
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setAdminViewClass(null);
+        // Wipe storage on signout
+        localStorage.clear();
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
           const profile = await API.auth.getSession();
@@ -64,8 +64,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [initAuth]);
 
   const login = async (email: string, pass: string) => {
     const foundUser = await API.auth.login(email, pass);
@@ -74,31 +76,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     try {
-      // 1. Sign out from Supabase (Server side)
+      setLoading(true);
       await supabase.auth.signOut();
       
-      // 2. Local State Reset
+      // Forced clean reset
       setUser(null);
       setAdminViewClass(null);
+      localStorage.clear();
+      sessionStorage.clear();
       
-      // 3. Complete Storage Wipe
-      // Nettoyage de tous les tokens possibles de Supabase
-      const keysToRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.includes('supabase') || key.includes('sb-'))) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-      
-      // 4. Final redirect and FORCE RELOAD to clear any remaining in-memory state
-      window.location.hash = '#/login';
+      // Reset navigation state
+      window.location.hash = '/login';
       window.location.reload(); 
     } catch (e) {
-      console.warn("Forced cleanup due to signout error:", e);
-      localStorage.clear();
-      window.location.hash = '#/login';
+      console.error("[SRE Security] Logout cleanup failed:", e);
       window.location.reload();
     }
   };
@@ -119,12 +110,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   if (loading) {
-      return (
-          <div id="app-loader">
-              <div className="spinner"></div>
-              <p className="mt-4 text-sm font-black text-gray-500 uppercase tracking-widest italic animate-pulse">Synchronisation JangHup...</p>
-          </div>
-      );
+    return (
+      <div id="app-loader">
+        <div className="spinner"></div>
+        <p className="mt-4 text-sm font-black text-gray-400 uppercase tracking-widest animate-pulse">Sécure Boot JANGHUP...</p>
+      </div>
+    );
   }
 
   return (

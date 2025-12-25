@@ -1,12 +1,12 @@
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { API } from '../services/api';
 import { Announcement, Exam, UserRole, Poll, MeetLink } from '../types';
 import { 
   Clock, GraduationCap, Loader2, BarChart2, 
   Calendar, Video, Megaphone, Radio, Zap, ArrowRight, 
-  Maximize2, TrendingUp, MapPin
+  TrendingUp, MapPin
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -21,7 +21,7 @@ const SkeletonCard = () => (
 export default function Dashboard() {
   const { user, adminViewClass } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = user?.role === UserRole.ADMIN;
+  const isMounted = useRef(true);
   const themeColor = user?.themeColor || '#0ea5e9';
 
   const [data, setData] = useState({
@@ -33,7 +33,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async (quiet = false) => {
+    if (!isMounted.current) return;
     if (!quiet) setLoading(true);
+    
     try {
       const [allAnns, allExams, allPolls, allMeets] = await Promise.all([
           API.announcements.list(0, 5),
@@ -42,9 +44,11 @@ export default function Dashboard() {
           API.meet.list()
       ]);
 
+      if (!isMounted.current) return;
+
       const filterByAccess = (itemClass: string) => {
         const target = itemClass || 'Général';
-        if (isAdmin && !adminViewClass) return true;
+        if (user?.role === UserRole.ADMIN && !adminViewClass) return true;
         if (adminViewClass) return target === adminViewClass || target === 'Général';
         return target === user?.className || target === 'Général';
       };
@@ -56,16 +60,20 @@ export default function Dashboard() {
         meets: allMeets.filter(m => filterByAccess(m.className)).slice(0, 1)
       });
     } catch (error) {
-      console.error("Dashboard sync error", error);
+      console.error("[Dashboard] Sync Issue", error);
     } finally {
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
     }
-  }, [user, adminViewClass, isAdmin]);
+  }, [user, adminViewClass]);
 
   useEffect(() => {
+    isMounted.current = true;
     fetchData();
     const sub = API.announcements.subscribe(() => fetchData(true));
-    return () => { sub.unsubscribe(); };
+    return () => { 
+      isMounted.current = false;
+      sub.unsubscribe(); 
+    };
   }, [fetchData]);
 
   const metrics = useMemo(() => [
@@ -95,7 +103,7 @@ export default function Dashboard() {
                 <span className="text-[10px] font-black uppercase tracking-widest leading-none">{user?.schoolName || 'ESP Dakar'} • Officiel</span>
              </div>
              <div>
-                <h2 className="text-5xl lg:text-7xl font-black text-gray-900 dark:text-white tracking-tighter italic uppercase leading-none">Bonjour, {user?.name.split(' ')[0]}</h2>
+                <h2 className="text-5xl lg:text-7xl font-black text-gray-900 dark:text-white tracking-tighter italic uppercase leading-none">Bonjour, {user?.name?.split(' ')[0]}</h2>
                 <p className="text-lg text-gray-500 dark:text-gray-400 mt-6 font-medium italic">Accédez à vos ressources académiques centralisées sur JangHup.</p>
              </div>
           </div>
@@ -133,7 +141,7 @@ export default function Dashboard() {
              {data.anns.map((ann) => (
                <div key={ann.id} onClick={() => navigate('/announcements')} className="bg-white dark:bg-gray-900 p-8 rounded-[3.5rem] shadow-soft border border-gray-100 dark:border-gray-800 hover:shadow-premium transition-all cursor-pointer group flex items-start gap-8">
                   <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center font-black text-gray-300 group-hover:bg-primary-500 group-hover:text-white transition-all shrink-0">
-                    {ann.author.charAt(0)}
+                    {ann.author?.charAt(0) || 'A'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xl font-black italic text-gray-900 dark:text-white truncate mb-2">{ann.title}</h4>
