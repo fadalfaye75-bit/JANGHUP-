@@ -133,3 +133,25 @@ export interface ActivityLog {
   type: 'create' | 'update' | 'delete' | 'security' | 'insert';
   timestamp: string;
 }
+
+// Added Grade interface to resolve error in Grades.tsx
+export interface Grade {
+  id: string;
+  user_id: string;
+  subject: string;
+  score: number;
+  maxScore: number;
+  coefficient: number;
+  semester: number;
+  comment?: string;
+}
+
+// Added DirectMessage interface to resolve error in Messages.tsx
+export interface DirectMessage {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  timestamp: string;
+  is_read: boolean;
+}

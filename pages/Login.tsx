@@ -94,10 +94,6 @@ export default function Login() {
             {!isLoading && <ChevronRight size={18} />}
           </button>
         </form>
-
-        <div className="mt-10 text-center border-t border-gray-100 dark:border-gray-800 pt-8">
-            <p className="text-[10px] text-gray-400 uppercase font-black tracking-[0.3em] italic">Propulsé par la Direction DSTI</p>
-        </div>
       </div>
     </div>
   );

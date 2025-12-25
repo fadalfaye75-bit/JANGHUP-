@@ -1,6 +1,6 @@
 
 import { supabase } from './supabaseClient';
-import { User, Announcement, Exam, MeetLink, Poll, ClassGroup, ActivityLog, AppNotification, UserRole, ScheduleFile, ScheduleSlot } from '../types';
+import { User, Announcement, Exam, MeetLink, Poll, ClassGroup, ActivityLog, AppNotification, UserRole, ScheduleFile, ScheduleSlot, Grade, DirectMessage } from '../types';
 
 const getErrorMessage = (error: any): string => {
   if (!error) return "";
@@ -190,7 +190,6 @@ export const API = {
       const { error } = await supabase.from('polls').update({ is_active: updates.isActive }).eq('id', id);
       if (error) handleAPIError(error, "Mise à jour statut échouée");
     },
-    // Fix: Added subscribe method to handle real-time poll updates
     subscribe: (callback: () => void) => supabase.channel('poll_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, callback).subscribe()
   },
 
@@ -223,7 +222,7 @@ export const API = {
     getSlots: async (className: string): Promise<ScheduleSlot[]> => {
       const { data, error } = await supabase.from('schedule_slots').select('*').or(`classname.eq.${className},classname.eq.Général`);
       if (error) return [];
-      return data.map(s => ({ id: s.id, day: s.day, startTime: s.start_time, endTime: s.end_time, subject: s.subject, teacher: s.teacher, room: s.room, color: s.color }));
+      return data.map(s => ({ id: s.id, day: s.day, start_time: s.start_time, end_time: s.end_time, subject: s.subject, teacher: s.teacher, room: s.room, color: s.color }));
     },
     saveSlots: async (className: string, slots: ScheduleSlot[]) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -278,6 +277,53 @@ export const API = {
   interactions: {
     incrementShare: async (table: string, id: string) => { 
       try { await supabase.rpc('increment_share_count', { target_table: table, target_id: id }); } catch (e) {}
+    }
+  },
+
+  // Added grades service to resolve error in Grades.tsx
+  grades: {
+    list: async (userId?: string): Promise<Grade[]> => {
+      const { data, error } = await supabase.from('grades').select('*').eq('user_id', userId).order('semester', { ascending: true });
+      if (error) return [];
+      return (data || []).map(g => ({
+        id: g.id,
+        user_id: g.user_id,
+        subject: g.subject,
+        score: g.score,
+        maxScore: g.max_score,
+        coefficient: g.coefficient,
+        semester: g.semester,
+        comment: g.comment
+      }));
+    }
+  },
+
+  // Added messaging service to resolve error in Messages.tsx
+  messaging: {
+    list: async (): Promise<DirectMessage[]> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+      const { data, error } = await supabase.from('direct_messages').select('*').or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`).order('timestamp', { ascending: false });
+      if (error) return [];
+      return (data || []).map(m => ({
+        id: m.id,
+        sender_id: m.sender_id,
+        receiver_id: m.receiver_id,
+        content: m.content,
+        timestamp: m.timestamp,
+        is_read: m.is_read
+      }));
+    },
+    send: async (receiverId: string, content: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Non authentifié");
+      const { error } = await supabase.from('direct_messages').insert({
+        sender_id: user.id,
+        receiver_id: receiverId,
+        content,
+        timestamp: new Date().toISOString()
+      });
+      if (error) handleAPIError(error, "Envoi message échoué");
     }
   },
 
