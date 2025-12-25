@@ -1,5 +1,5 @@
 
-import React, { lazy, Suspense, useEffect, ReactNode } from 'react';
+import React, { lazy, Suspense, useEffect, ReactNode, Component } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { NotificationProvider } from './context/NotificationContext.tsx';
@@ -7,11 +7,38 @@ import { ChatProvider } from './context/ChatContext.tsx';
 import { Loader2, RefreshCcw, AlertTriangle } from 'lucide-react';
 import { UserRole } from './types.ts';
 
-class ErrorBoundary extends React.Component<{ children?: ReactNode }, { hasError: boolean; error: Error | null }> {
-  state = { hasError: false, error: null };
-  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
-  componentDidCatch(error: Error, errorInfo: any) { console.error("JangHup Error", error, errorInfo); }
+// Added explicit interfaces for ErrorBoundary props and state to fix the "Property 'props' does not exist" error
+interface ErrorBoundaryProps {
+  children?: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+// Updated ErrorBoundary to use explicit generics and constructor for better TypeScript compatibility
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Explicitly declare state and props to resolve TypeScript errors in some environments
+  public state: ErrorBoundaryState;
+  public props: ErrorBoundaryProps;
+
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.props = props;
+    this.state = { hasError: false, error: null };
+  }
+  
+  static getDerivedStateFromError(error: Error) { 
+    return { hasError: true, error }; 
+  }
+  
+  componentDidCatch(error: Error, errorInfo: any) { 
+    console.error("JangHup Error", error, errorInfo); 
+  }
+  
   render() {
+    // Accessing state property on this
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 p-6 text-center animate-fade-in">
@@ -21,6 +48,7 @@ class ErrorBoundary extends React.Component<{ children?: ReactNode }, { hasError
         </div>
       );
     }
+    // Accessing props property on this
     return this.props.children;
   }
 }

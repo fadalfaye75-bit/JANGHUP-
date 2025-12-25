@@ -113,7 +113,10 @@ export default function Exams() {
       
       const body = `🔵 JangHup – ${className}\n\n📌 AVIS D'EXAMEN : ${exam.subject.toUpperCase()}\n\n📅 Date : ${dateStr}\n⏰ Heure : ${d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}\n📍 Lieu : Salle ${exam.room}\n⏱️ Durée : ${exam.duration}\n\n📝 Notes : ${exam.notes || 'N/A'}\n\n🔗 Consulter sur JangHup : https://janghup.app/#/exams\n\n—\nPlateforme JangHup\nCommunication académique officielle`;
       
-      window.location.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const mailtoLink = document.createElement('a');
+      mailtoLink.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      mailtoLink.click();
+      
       API.interactions.incrementShare('exams', exam.id).catch(() => {});
     } catch (e) {
       console.error("Email share failed", e);

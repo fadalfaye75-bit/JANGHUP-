@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Plus, Trash2, Lock, Unlock, Loader2, BarChart2, Check, Users, Search, Sparkles, Shield, Send, Share2, AlertCircle, Vote as VoteIcon, X, TrendingUp, Trophy, Crown, ArrowRight, MessageCircle, Mail, BarChart3, CheckCircle2, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, Poll, ClassGroup } from '../types';
@@ -19,6 +19,7 @@ import {
 export default function Polls() {
   const { user } = useAuth();
   const { addNotification } = useNotification();
+  const isMounted = useRef(true);
   const themeColor = user?.themeColor || '#0ea5e9';
   
   const [polls, setPolls] = useState<Poll[]>([]);
@@ -48,19 +49,23 @@ export default function Polls() {
     try {
       if(showLoader) setLoading(true); 
       const data = await API.polls.list();
-      setPolls(data);
+      if (isMounted.current) setPolls(data);
     } catch (error: any) {
       addNotification({ title: 'Erreur Sync', message: 'Urnes inaccessibles.', type: 'alert' });
     } finally {
-      if(showLoader) setLoading(false);
+      if(showLoader && isMounted.current) setLoading(false);
     }
   }, [addNotification]);
 
   useEffect(() => {
+    isMounted.current = true;
     fetchPolls(true);
-    API.classes.list().then(setClasses).catch(() => {});
+    API.classes.list().then(data => { if(isMounted.current) setClasses(data); }).catch(() => {});
     const subscription = API.polls.subscribe(() => fetchPolls(false));
-    return () => { subscription.unsubscribe(); };
+    return () => { 
+      isMounted.current = false;
+      subscription.unsubscribe(); 
+    };
   }, [fetchPolls]);
 
   const handleShareWhatsApp = (poll: Poll) => {
@@ -90,7 +95,6 @@ export default function Polls() {
       const targetClass = classes.find(c => c.name === poll.className);
       const recipient = targetClass?.email || '';
       const className = poll.className || 'Filière';
-      
       const subject = `[JangHup – ${className}] Consultation : ${poll.question}`;
       let optionsText = poll.options
         .map(o => {
@@ -101,7 +105,9 @@ export default function Polls() {
 
       const body = `🔵 JangHup – ${className}\n\n📊 CONSULTATION : ${poll.question.toUpperCase()}\n\n${optionsText}\n\n👥 Total de participations : ${poll.totalVotes}\n\n🗳️ Voter sur JangHup : https://janghup.app/#/polls\n\n—\nPlateforme JangHup\nCommunication académique officielle`;
       
-      window.location.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const mailtoLink = document.createElement('a');
+      mailtoLink.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      mailtoLink.click();
       API.interactions.incrementShare('polls', poll.id).catch(() => {});
     } catch (e) {
       console.error("Email share failed", e);
@@ -124,8 +130,8 @@ export default function Polls() {
     } catch (error: any) {
       addNotification({ title: 'Erreur', message: "Impossible de voter.", type: 'alert' });
     } finally {
-      setVotingPollId(null);
-      setTimeout(() => setJustVotedOptionId(null), 800);
+      if (isMounted.current) setVotingPollId(null);
+      setTimeout(() => { if(isMounted.current) setJustVotedOptionId(null) }, 800);
     }
   };
 

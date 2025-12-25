@@ -5,7 +5,8 @@ import { API } from '../services/api';
 import { 
   Plus, Share2, Trash2, Loader2, Pencil, 
   Megaphone, Search, Bookmark, Maximize2,
-  ExternalLink, Trash, Link2, X, MessageCircle, Mail
+  ExternalLink, Trash, Link2, X, MessageCircle, Mail,
+  Link as LinkIcon
 } from 'lucide-react';
 import { UserRole, Announcement, AnnouncementPriority, ExternalLink as ExtLinkType, ClassGroup } from '../types';
 import Modal from '../components/Modal';
@@ -102,7 +103,10 @@ export default function Announcements() {
       const subject = `[JangHup – ${className}] ${ann.title}`;
       const body = `🔵 JangHup – ${className}\n\n📌 ANNONCE : ${ann.title.toUpperCase()}\n\n${ann.content}\n\n---\nPublié le : ${new Date(ann.date).toLocaleDateString()}\nPar : ${ann.author}\n\n🔗 Consulter sur JangHup : https://janghup.app/#/announcements\n\n—\nPlateforme JangHup\nCommunication académique officielle`;
       
-      window.location.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const mailtoLink = document.createElement('a');
+      mailtoLink.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      mailtoLink.click();
+      
       API.interactions.incrementShare('announcements', ann.id).catch(() => {});
     } catch (e) {
       console.error("Email share failed", e);
@@ -147,18 +151,54 @@ export default function Announcements() {
     setIsModalOpen(true);
   };
 
+  const handleAddLink = () => {
+    setNewAnn(prev => ({
+      ...prev,
+      links: [...prev.links, { label: '', url: '' }]
+    }));
+  };
+
+  const handleRemoveLink = (index: number) => {
+    setNewAnn(prev => ({
+      ...prev,
+      links: prev.links.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleLinkChange = (index: number, field: 'label' | 'url', value: string) => {
+    setNewAnn(prev => {
+      const updatedLinks = [...prev.links];
+      updatedLinks[index] = { ...updatedLinks[index], [field]: value };
+      return { ...prev, links: updatedLinks };
+    });
+  };
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting || !newAnn.title.trim() || !newAnn.content.trim()) return;
+    
+    // Filtrer les liens vides
+    const validLinks = newAnn.links.filter(l => l.label.trim() !== '' && l.url.trim() !== '');
+    
     setSubmitting(true);
     try {
-      const payload = { ...newAnn, className: user?.role === UserRole.ADMIN ? newAnn.className : (user?.className || 'Général') };
+      const payload = { 
+        ...newAnn, 
+        links: validLinks,
+        className: user?.role === UserRole.ADMIN ? newAnn.className : (user?.className || 'Général') 
+      };
+      
       if (editingId) await API.announcements.update(editingId, payload);
       else await API.announcements.create(payload);
+      
       setIsModalOpen(false);
       fetchAnnouncements(false);
       addNotification({ title: 'Succès', message: 'Opération réussie.', type: 'success' });
-    } catch (error: any) { addNotification({ title: 'Erreur', message: error?.message, type: 'alert' }); } finally { setSubmitting(false); }
+    } catch (error: any) { 
+      addNotification({ title: 'Erreur', message: error?.message, type: 'alert' }); 
+    } finally { 
+      setSubmitting(false); 
+    }
   };
 
   const displayedAnnouncements = useMemo(() => {
@@ -220,6 +260,23 @@ export default function Announcements() {
                 </div>
                 <h3 className="text-2xl font-black text-gray-900 dark:text-white italic tracking-tighter mb-4 cursor-pointer hover:underline underline-offset-4 decoration-2" onClick={() => setViewingAnn(ann)} style={{ textDecorationColor: annColor }}>{ann.title}</h3>
                 <p className="text-gray-600 dark:text-gray-300 italic text-sm line-clamp-3 mb-6 leading-relaxed">{ann.content}</p>
+                
+                {ann.links && ann.links.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {ann.links.map((link, idx) => (
+                      <a 
+                        key={idx} 
+                        href={link.url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-500 hover:text-white transition-all shadow-sm"
+                      >
+                        <LinkIcon size={12} /> {link.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
+
                 <div className="flex gap-4">
                   <button onClick={() => setViewingAnn(ann)} className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transform transition-transform group-hover:translate-x-1" style={{ color: annColor }}>Lire la suite <Maximize2 size={14} /></button>
                 </div>
@@ -242,26 +299,74 @@ export default function Announcements() {
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Modifier l'annonce" : "Nouvelle annonce"}>
          <form onSubmit={handleFormSubmit} className="space-y-6">
-            <input required value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold text-sm outline-none" placeholder="Titre..." />
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Titre de l'annonce</label>
+              <input required value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-primary-50/20" placeholder="Titre..." />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
-              <select value={newAnn.priority} onChange={e => setNewAnn({...newAnn, priority: e.target.value as any})} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase outline-none">
-                <option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent</option>
-              </select>
-              {user?.role === UserRole.ADMIN && (
-                <select value={newAnn.className} onChange={e => setNewAnn({...newAnn, className: e.target.value})} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase outline-none">
-                  <option value="Général">Toute l'école</option>
-                  {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Priorité</label>
+                <select value={newAnn.priority} onChange={e => setNewAnn({...newAnn, priority: e.target.value as any})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase outline-none cursor-pointer">
+                  <option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent</option>
                 </select>
+              </div>
+              {user?.role === UserRole.ADMIN && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cible</label>
+                  <select value={newAnn.className} onChange={e => setNewAnn({...newAnn, className: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase outline-none cursor-pointer">
+                    <option value="Général">Toute l'école</option>
+                    {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  </select>
+                </div>
               )}
             </div>
-            <textarea required value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} rows={6} className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold text-sm outline-none italic" placeholder="Contenu..." />
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contenu</label>
+              <textarea required value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} rows={6} className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold text-sm outline-none italic focus:ring-4 focus:ring-primary-50/20" placeholder="Décrivez votre annonce ici..." />
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Liens utiles (Optionnel)</label>
+                <button type="button" onClick={handleAddLink} className="text-[10px] font-black text-primary-500 uppercase tracking-widest flex items-center gap-1 hover:underline">
+                  <Plus size={14} /> Ajouter un lien
+                </button>
+              </div>
+              
+              <div className="space-y-3">
+                {newAnn.links.map((link, idx) => (
+                  <div key={idx} className="flex gap-2 items-start animate-in slide-in-from-right-2">
+                    <div className="flex-1 space-y-2">
+                      <input 
+                        value={link.label} 
+                        onChange={e => handleLinkChange(idx, 'label', e.target.value)} 
+                        className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-700 rounded-xl text-[11px] font-bold outline-none" 
+                        placeholder="Nom du lien (ex: Formulaire)" 
+                      />
+                      <input 
+                        value={link.url} 
+                        onChange={e => handleLinkChange(idx, 'url', e.target.value)} 
+                        className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-700 rounded-xl text-[11px] font-bold outline-none" 
+                        placeholder="URL (https://...)" 
+                      />
+                    </div>
+                    <button type="button" onClick={() => handleRemoveLink(idx)} className="p-3 text-red-400 hover:text-red-500 bg-red-50 dark:bg-red-900/10 rounded-xl transition-all">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <button type="submit" disabled={submitting} className="w-full py-5 bg-primary-500 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-xl">
-               {submitting ? <Loader2 className="animate-spin mx-auto" size={20} /> : (editingId ? "Enregistrer" : "Publier")}
+               {submitting ? <Loader2 className="animate-spin mx-auto" size={20} /> : (editingId ? "Enregistrer les modifications" : "Publier l'annonce")}
             </button>
          </form>
       </Modal>
 
-      <Modal isOpen={!!viewingAnn} onClose={() => setViewingAnn(null)} title="Détail">
+      <Modal isOpen={!!viewingAnn} onClose={() => setViewingAnn(null)} title="Détail de l'annonce">
         {viewingAnn && (
           <div className="space-y-8">
             <div className="space-y-2">
@@ -269,9 +374,31 @@ export default function Announcements() {
               <h3 className="text-3xl font-black text-gray-900 dark:text-white italic leading-tight tracking-tight">{viewingAnn.title}</h3>
               <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{viewingAnn.author} • {new Date(viewingAnn.date).toLocaleDateString()}</p>
             </div>
+            
             <div className="bg-gray-50 dark:bg-gray-800/50 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700">
               <StructuredContent content={viewingAnn.content} />
             </div>
+
+            {viewingAnn.links && viewingAnn.links.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Ressources jointes</p>
+                <div className="grid gap-2">
+                  {viewingAnn.links.map((link, idx) => (
+                    <a 
+                      key={idx} 
+                      href={link.url} 
+                      target="_blank" 
+                      rel="noreferrer" 
+                      className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-primary-500 transition-all group"
+                    >
+                      <span className="text-sm font-bold italic text-gray-700 dark:text-gray-300 group-hover:text-primary-500">{link.label}</span>
+                      <ExternalLink size={16} className="text-gray-400 group-hover:text-primary-500" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button onClick={() => handleShareWhatsApp(viewingAnn)} className="flex-1 py-4 bg-[#25D366] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-md">WhatsApp</button>
               <button onClick={() => handleShareEmail(viewingAnn)} className="flex-1 py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-md">Email</button>

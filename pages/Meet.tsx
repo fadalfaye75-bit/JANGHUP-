@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Video, ExternalLink, Plus, Trash2, Calendar, Copy, Loader2, Link as LinkIcon, Share2, Pencil, Search, Filter, Radio, Sparkles, Clock, ArrowRight, VideoOff, CheckCircle2, Save, MessageCircle, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, MeetLink, ClassGroup } from '../types';
@@ -17,6 +17,7 @@ const PLATFORM_ICONS = {
 export default function Meet() {
   const { user, adminViewClass } = useAuth();
   const { addNotification } = useNotification();
+  const isMounted = useRef(true);
   const themeColor = user?.themeColor || '#0ea5e9';
   
   const [meetings, setMeetings] = useState<MeetLink[]>([]);
@@ -35,19 +36,21 @@ export default function Meet() {
   const isAdmin = user?.role === UserRole.ADMIN;
 
   useEffect(() => {
+    isMounted.current = true;
     fetchMeetings();
-    API.classes.list().then(setClasses);
+    API.classes.list().then(data => { if(isMounted.current) setClasses(data); });
+    return () => { isMounted.current = false; };
   }, [user, adminViewClass]);
 
   const fetchMeetings = async () => {
     try {
       setLoading(true);
       const data = await API.meet.list();
-      setMeetings(data);
+      if (isMounted.current) setMeetings(data);
     } catch (error) {
       addNotification({ title: 'Erreur', message: 'Chargement échoué.', type: 'alert' });
     } finally {
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
     }
   };
 
@@ -72,9 +75,7 @@ export default function Meet() {
   const handleShareWhatsApp = (link: MeetLink) => {
     try {
       const className = link.className || 'Filière';
-      
       const text = `🔵 *JangHup – ${className}*\n\n*📽️ SESSION EN DIRECT : ${link.title.toUpperCase()}*\n\n📅 *Horaire :* ${link.time}\n🧩 *Plateforme :* ${link.platform}\n\n🔗 *Lien de connexion :*\n${link.url}\n\n—\nPlateforme JangHup\nCommunication académique officielle`;
-      
       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
       API.interactions.incrementShare('meet_links', link.id).catch(() => {});
     } catch (e) {
@@ -87,11 +88,12 @@ export default function Meet() {
       const targetClass = classes.find(c => c.name === link.className);
       const recipient = targetClass?.email || '';
       const className = link.className || 'Filière';
-
       const subject = `[JangHup – ${className}] Session Direct : ${link.title}`;
       const body = `🔵 JangHup – ${className}\n\n📽️ SESSION EN DIRECT : ${link.title.toUpperCase()}\n\n📅 Horaire : ${link.time}\n🧩 Plateforme : ${link.platform}\n\n🔗 Lien de connexion : ${link.url}\n\n—\nPlateforme JangHup\nCommunication académique officielle`;
       
-      window.location.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const mailtoLink = document.createElement('a');
+      mailtoLink.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      mailtoLink.click();
       API.interactions.incrementShare('meet_links', link.id).catch(() => {});
     } catch (e) {
       console.error("Email share failed", e);

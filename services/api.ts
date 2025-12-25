@@ -115,13 +115,25 @@ export const API = {
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase.from('profiles').select('name').eq('id', user?.id).single();
       const { error } = await supabase.from('announcements').insert({ 
-        user_id: user?.id, title: ann.title, content: ann.content, priority: ann.priority, 
-        classname: ann.className || 'Général', author: profile?.name || 'Admin', date: new Date().toISOString()
+        user_id: user?.id, 
+        title: ann.title, 
+        content: ann.content, 
+        priority: ann.priority, 
+        classname: ann.className || 'Général', 
+        author: profile?.name || 'Admin', 
+        date: new Date().toISOString(),
+        links: ann.links || []
       });
       if (error) handleAPIError(error, "Publication échouée");
     },
     update: async (id: string, ann: any) => {
-      const { error } = await supabase.from('announcements').update({ title: ann.title, content: ann.content, priority: ann.priority, classname: ann.className }).eq('id', id);
+      const { error } = await supabase.from('announcements').update({ 
+        title: ann.title, 
+        content: ann.content, 
+        priority: ann.priority, 
+        classname: ann.className,
+        links: ann.links || []
+      }).eq('id', id);
       if (error) handleAPIError(error, "Modification échouée");
     },
     delete: async (id: string) => {
@@ -222,7 +234,6 @@ export const API = {
     getSlots: async (className: string): Promise<ScheduleSlot[]> => {
       const { data, error } = await supabase.from('schedule_slots').select('*').or(`classname.eq.${className},classname.eq.Général`);
       if (error) return [];
-      // Correction du mapping pour correspondre à l'interface ScheduleSlot (CamelCase)
       return data.map(s => ({ 
         id: s.id, 
         day: s.day, 
@@ -232,17 +243,17 @@ export const API = {
         teacher: s.teacher, 
         room: s.room, 
         color: s.color 
-      }));
+      })) as ScheduleSlot[];
     },
     saveSlots: async (className: string, slots: ScheduleSlot[]) => {
       const { data: { user } } = await supabase.auth.getUser();
       await supabase.from('schedule_slots').delete().eq('classname', className);
       const toInsert = slots.map(s => ({ day: s.day, start_time: s.startTime, end_time: s.endTime, subject: s.subject, teacher: s.teacher, room: s.room, color: s.color, classname: className, user_id: user?.id }));
-      const { error } = await supabase.from('schedule_slots').insert(toInsert);
+      const { error = null } = await supabase.from('schedule_slots').insert(toInsert);
       if (error) handleAPIError(error, "Publication échouée");
     },
     deleteFile: async (id: string) => {
-      const { error } = await supabase.from('schedules').delete().eq('id', id);
+      const { error = null } = await supabase.from('schedules').delete().eq('id', id);
       if (error) handleAPIError(error, "Suppression du document échouée");
     }
   },
@@ -263,7 +274,7 @@ export const API = {
       if (error) handleAPIError(error, "Modification Meet échouée");
     },
     delete: async (id: string) => {
-      const { error } = await supabase.from('meet_links').delete().eq('id', id);
+      const { error = null } = await supabase.from('meet_links').delete().eq('id', id);
       if (error) handleAPIError(error, "Suppression Meet échouée");
     }
   },
@@ -325,7 +336,7 @@ export const API = {
     send: async (receiverId: string, content: string) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Non authentifié");
-      const { error } = await supabase.from('direct_messages').insert({
+      const { error = null } = await supabase.from('direct_messages').insert({
         sender_id: user.id,
         receiver_id: receiverId,
         content,
