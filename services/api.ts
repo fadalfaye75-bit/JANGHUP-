@@ -1,4 +1,3 @@
-
 import { supabase } from './supabaseClient';
 import { User, Announcement, UserRole, ClassGroup, Exam, Poll, MeetLink, ScheduleSlot, ActivityLog, AppNotification, ScheduleFile, Grade, DirectMessage } from '../types';
 
@@ -81,7 +80,6 @@ export const API = {
     },
     delete: async (id: string) => supabase.from('announcements').delete().eq('id', id),
     subscribe: (callback: () => void) => {
-      // Added schema: 'public' to filter and ensured unsubscribe returns void to prevent useEffect type errors
       const sub = supabase.channel('ann_prod').on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, callback).subscribe();
       return { unsubscribe: () => { supabase.removeChannel(sub); } };
     }
@@ -136,7 +134,6 @@ export const API = {
     },
     delete: async (id: string) => supabase.rpc('delete_poll_complete', { p_poll_id: id }),
     subscribe: (callback: () => void) => {
-      // Added schema: 'public' to filter and ensured unsubscribe returns void to prevent useEffect type errors
       const sub = supabase.channel('polls_prod').on('postgres_changes', { event: '*', schema: 'public', table: 'polls' }, callback).subscribe();
       return { unsubscribe: () => { supabase.removeChannel(sub); } };
     }
@@ -194,12 +191,10 @@ export const API = {
       return data || [];
     },
     saveSlots: async (className: string, slots: ScheduleSlot[]) => {
-      // Suppression des anciens créneaux
       const { error: delError } = await supabase.from('schedule_slots').delete().eq('className', className);
       if (delError) throw delError;
       
       if (slots.length > 0) {
-        // Insertion des nouveaux créneaux avec respect de la casse Supabase (camelCase nécessite double-quotes en SQL mais mappage auto ici)
         const { error: insError } = await supabase.from('schedule_slots').insert(
           slots.map(s => ({
             day: s.day,
@@ -277,7 +272,6 @@ export const API = {
       if (error) throw error;
     },
     subscribe: (callback: () => void) => {
-      // Added schema: 'public' to filter and ensured unsubscribe returns void to prevent useEffect type errors
       const sub = supabase.channel('notif_prod').on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, callback).subscribe();
       return { unsubscribe: () => { supabase.removeChannel(sub); } };
     }

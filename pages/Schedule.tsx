@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Loader2, Save, FileSpreadsheet, MapPin, User as UserIcon, Clock, 
-  Calendar as CalendarIcon, Edit3, Trash2, Mail, CheckCircle2, 
-  ChevronRight, ChevronLeft, Download, Info, Coffee, Moon, BookOpen, UserCheck, Send
+  Loader2, Save, MapPin, User as UserIcon, Clock, 
+  Calendar as CalendarIcon, Edit3, Trash2, Mail, 
+  Download, Coffee, BookOpen, UserCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, ScheduleSlot, ClassGroup } from '../types';
@@ -108,7 +108,7 @@ export default function Schedule() {
       setHasUnsavedChanges(false);
       fetchData(true);
     } catch (e: any) {
-      addNotification({ title: 'Erreur Serveur', message: 'Vérifiez les contraintes horaires (pause 12h-14h30).', type: 'alert' });
+      addNotification({ title: 'Erreur Serveur', message: 'Vérifiez les contraintes horaires.', type: 'alert' });
     } finally {
       setSaving(false);
     }
@@ -188,8 +188,15 @@ export default function Schedule() {
       });
   };
 
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center py-24 gap-4">
+      <Loader2 className="animate-spin text-brand" size={48} />
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic animate-pulse">Chargement de l'emploi du temps...</p>
+    </div>
+  );
+
   return (
-    <div className="max-w-[1600px] mx-auto space-y-8 animate-fade-in pb-32 px-4">
+    <div className="max-w-[1600px] mx-auto space-y-12 animate-fade-in pb-32 px-4">
       {/* Header UI */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-6">
@@ -199,7 +206,7 @@ export default function Schedule() {
               <div className="flex items-center gap-4 mt-3">
                  <span className="px-3 py-1 bg-brand-50 text-brand text-[9px] font-black uppercase rounded-lg border border-brand-100">{currentClassName}</span>
                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic flex items-center gap-2">
-                   <Clock size={12}/> Grille Officielle ESP
+                   <Clock size={12}/> Grille Interactive ESP
                  </span>
               </div>
            </div>
@@ -219,13 +226,27 @@ export default function Schedule() {
                   disabled={saving} 
                   className="bg-brand text-white px-10 py-4 rounded-3xl text-[11px] font-black uppercase tracking-widest shadow-premium flex items-center gap-3 animate-pulse transition-all"
                 >
-                  {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />} Enregistrer les changements
+                  {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />} Publier la grille
                 </button>
              )}
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-[3.5rem] shadow-premium border border-slate-50 dark:border-slate-800 overflow-hidden">
+      {/* Interactive Grid */}
+      <section className="bg-white dark:bg-slate-900 rounded-[3.5rem] shadow-premium border border-slate-50 dark:border-slate-800 overflow-hidden">
+        <div className="p-10 border-b border-slate-50 dark:border-slate-800 bg-slate-50/30 flex items-center justify-between">
+            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-[0.4em] italic flex items-center gap-3">
+                 <CalendarIcon size={18} className="text-brand" /> Grille Interactive
+            </h3>
+            <div className="flex items-center gap-4">
+               {CATEGORY_COLORS.map(c => (
+                 <div key={c.name} className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${c.hex === '#87CEEB' ? 'bg-brand' : ''}`} style={{ backgroundColor: c.hex }} />
+                    <span className="text-[8px] font-black uppercase text-slate-400 tracking-tighter">{c.name}</span>
+                 </div>
+               ))}
+            </div>
+        </div>
         <div className="overflow-x-auto custom-scrollbar">
           <div className="min-w-[1200px]">
              <div className="grid grid-cols-[120px_repeat(6,1fr)] bg-slate-50 dark:bg-slate-800/50">
@@ -250,7 +271,7 @@ export default function Schedule() {
              </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title={selectedSlot?.id && !selectedSlot.id.toString().startsWith('temp-') ? "Modifier la séance" : "Programmer un cours"}>
         {selectedSlot && (
