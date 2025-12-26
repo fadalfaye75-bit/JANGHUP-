@@ -51,6 +51,15 @@ export default function Exams() {
     addNotification({ title: 'Copié', message: 'Détails copiés.', type: 'success' });
   }, [addNotification]);
 
+  const handleShareEmail = useCallback((exam: Exam) => {
+    const classObj = classes.find(c => c.name === exam.className);
+    const to = classObj?.email || '';
+    const examDate = new Date(exam.date);
+    const subject = `📅 EXAMEN À VENIR: ${exam.subject}`;
+    const body = `📚 Matière : ${exam.subject}\n📍 Salle : ${exam.room}\n🕒 Date : ${examDate.toLocaleString('fr-FR')}\n⏱️ Durée : ${exam.duration}\n📝 Notes : ${exam.notes || 'Aucune'}\n\n🎓 Plateforme JANGHUP ESP`;
+    API.sharing.email(to, subject, body);
+  }, [classes]);
+
   const handleDelete = useCallback(async (id: string) => {
     if (!window.confirm('Supprimer cette épreuve ?')) return;
     try {
@@ -143,6 +152,7 @@ export default function Exams() {
               
               <div className="flex flex-wrap md:flex-col gap-3 md:pl-10 md:border-l border-slate-100 dark:border-slate-800 self-stretch justify-center">
                 <button onClick={() => API.sharing.whatsapp(`🚨 EXAMEN JANGHUP: ${exam.subject} le ${examDate.toLocaleString()}`)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm active:scale-90" title="WhatsApp"><MessageCircle size={20}/></button>
+                <button onClick={() => handleShareEmail(exam)} className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-500 hover:text-white transition-all shadow-sm active:scale-90" title="Partager par Email"><Mail size={20}/></button>
                 <button onClick={() => handleCopy(exam)} className="p-4 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-900 hover:text-white transition-all shadow-sm active:scale-90" title="Copier Détails"><Copy size={20}/></button>
                 {canManage && (
                   <>
@@ -178,7 +188,7 @@ export default function Exams() {
         }} className="space-y-6">
           <div className="space-y-2">
              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Module / Unité</label>
-             <input required placeholder="ex: Réseaux & Télécoms..." value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-none focus:ring-4 focus:ring-amber-50" />
+             <input required placeholder="ex: Réseaux & Télécoms..." value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic border-none focus:ring-4 focus:ring-amber-50" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <input required type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold border-none" />
