@@ -48,10 +48,11 @@ export default function Announcements() {
     }
   }, []);
 
+  // Fixed the useEffect cleanup to return void explicitly to avoid TypeScript errors with async unsubscribe
   useEffect(() => {
     fetchAll();
     const sub = API.announcements.subscribe(fetchAll);
-    return () => sub.unsubscribe();
+    return () => { sub.unsubscribe(); };
   }, [fetchAll]);
 
   // Validation en temps réel

@@ -1,16 +1,14 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Loader2, Save, FileSpreadsheet, MapPin, User as UserIcon, Clock, 
-  Calendar as CalendarIcon, Edit3, Trash2, AlertCircle, CheckCircle2, 
-  ChevronRight, ChevronLeft, Download, Info, Coffee, Moon, BookOpen, UserCheck
+  Calendar as CalendarIcon, Edit3, Trash2, Mail, CheckCircle2, 
+  ChevronRight, ChevronLeft, Download, Info, Coffee, Moon, BookOpen, UserCheck, Send
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { UserRole, ScheduleSlot } from '../types';
+import { UserRole, ScheduleSlot, ClassGroup } from '../types';
 import { useNotification } from '../context/NotificationContext';
 import { API } from '../services/api';
 import Modal from '../components/Modal';
-import * as XLSX from 'xlsx';
 
 const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
@@ -47,9 +45,9 @@ const CATEGORY_COLORS = [
 export default function Schedule() {
   const { user } = useAuth();
   const { addNotification } = useNotification();
-  const importExcelRef = useRef<HTMLInputElement>(null);
   
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
+  const [classes, setClasses] = useState<ClassGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -62,8 +60,12 @@ export default function Schedule() {
   const fetchData = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     try {
-      const gridSlots = await API.schedules.getSlots(currentClassName);
+      const [gridSlots, classList] = await Promise.all([
+        API.schedules.getSlots(currentClassName),
+        API.classes.list()
+      ]);
       setSlots(gridSlots || []);
+      setClasses(classList || []);
       setHasUnsavedChanges(false);
     } catch (error: any) {
       addNotification({ title: 'Erreur Sync', message: error.message, type: 'alert' });
@@ -76,119 +78,37 @@ export default function Schedule() {
     fetchData();
   }, [fetchData]);
 
-  // Analyse intelligente d'une cellule Excel
-  const parseExcelCell = (content: string) => {
-    if (!content) return { subject: '', teacher: '', room: '' };
-    const lines = content.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    let subjectParts: string[] = [];
-    let teacher = "";
-    let room = "";
-
-    lines.forEach(line => {
-      const lower = line.toLowerCase();
-      // Détection prof
-      if (/^(dr|pr|m|mme)\.?\s/i.test(lower) || lower.includes('prof')) {
-        teacher = line;
-      } 
-      // Détection salle
-      else if (lower.includes('salle') || lower.includes('lieu') || lower.includes('amphi') || /^[a-z]\d{3}$/i.test(lower)) {
-        room = line.replace(/salle\s*:?|lieu\s*:?|amphi\s*:?/i, '').trim();
-      } 
-      // Sinon c'est le sujet
-      else {
-        subjectParts.push(line);
+  const handleShareEmail = () => {
+    const classObj = classes.find(c => c.name === currentClassName);
+    const to = classObj?.email || '';
+    const subject = `📅 EMPLOI DU TEMPS MIS À JOUR : ${currentClassName}`;
+    
+    let scheduleSummary = `Voici l'emploi du temps officiel pour la classe ${currentClassName} :\n\n`;
+    DAYS.forEach((day, idx) => {
+      const daySlots = slots.filter(s => s.day === idx).sort((a,b) => a.startTime.localeCompare(b.startTime));
+      if (daySlots.length > 0) {
+        scheduleSummary += `--- ${day.toUpperCase()} ---\n`;
+        daySlots.forEach(s => {
+          scheduleSummary += `${s.startTime} - ${s.endTime} | ${s.subject} (${s.teacher} - ${s.room})\n`;
+        });
+        scheduleSummary += `\n`;
       }
     });
-
-    return { 
-      subject: subjectParts.join(' / ') || "Module Inconnu", 
-      teacher: teacher || "Enseignant non spécifié", 
-      room: room || "Salle à définir" 
-    };
-  };
-
-  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-        const newSlots: ScheduleSlot[] = [];
-        // Trouver la ligne d'entête des jours
-        const headerRowIdx = data.findIndex(row => row.some(cell => cell?.toString().toLowerCase().includes('lundi')));
-        if (headerRowIdx === -1) throw new Error("Format d'emploi du temps non reconnu (Lundi non trouvé).");
-        
-        const headerRow = data[headerRowIdx];
-        const dayIndices = DAYS.map(day => headerRow.findIndex(cell => cell?.toString().toLowerCase().includes(day.toLowerCase())));
-
-        for (let r = headerRowIdx + 1; r < data.length; r++) {
-          const row = data[r];
-          const timeCell = row[0]?.toString();
-          if (!timeCell || !timeCell.includes(':')) continue;
-
-          // Normalisation de l'heure
-          let startTime = timeCell.trim().split(/[ \-]/)[0];
-          if (startTime.length === 4) startTime = `0${startTime}`;
-          
-          if (isForbiddenSlot(startTime)) continue;
-
-          dayIndices.forEach((colIndex, dayIdx) => {
-            if (colIndex === -1) return;
-            const content = row[colIndex];
-            
-            if (content && content.toString().trim().length > 2) {
-              const { subject, teacher, room } = parseExcelCell(content.toString());
-              
-              // Détermination de l'heure de fin par défaut (1h30 plus tard ou prochaine cellule)
-              const startIdx = TIME_SLOTS.indexOf(startTime);
-              const endTime = TIME_SLOTS[startIdx + 3] || (startTime < "12:00" ? "12:00" : "18:30");
-
-              newSlots.push({
-                day: dayIdx,
-                startTime: startTime,
-                endTime: endTime,
-                subject,
-                teacher,
-                room,
-                color: subject.toLowerCase().includes('tp') ? CATEGORY_COLORS[1].hex : CATEGORY_COLORS[0].hex,
-                className: currentClassName
-              });
-            }
-          });
-        }
-
-        if (newSlots.length > 0) {
-          setSlots(newSlots);
-          setHasUnsavedChanges(true);
-          addNotification({ 
-            title: 'Import Réussi', 
-            message: `${newSlots.length} cours extraits. Vérifiez avant de publier.`, 
-            type: 'success' 
-          });
-        }
-      } catch (err: any) {
-        addNotification({ title: 'Erreur Import', message: err.message, type: 'alert' });
-      }
-    };
-    reader.readAsBinaryString(file);
-    if (importExcelRef.current) importExcelRef.current.value = '';
+    
+    scheduleSummary += `\nConsultez la version interactive sur JangHup ESP.`;
+    API.sharing.email(to, subject, scheduleSummary);
+    addNotification({ title: 'Diffusion Email', message: `Partage envoyé vers ${to || 'administration'}`, type: 'success' });
   };
 
   const handlePublish = async () => {
     setSaving(true);
     try {
       await API.schedules.saveSlots(currentClassName, slots);
-      addNotification({ title: 'Grille Publiée', message: 'L\'emploi du temps a été synchronisé avec succès.', type: 'success' });
+      addNotification({ title: 'Grille Publiée', message: 'L\'emploi du temps est synchronisé.', type: 'success' });
       setHasUnsavedChanges(false);
       fetchData(true);
     } catch (e: any) {
-      addNotification({ title: 'Erreur Serveur', message: 'Impossible de sauvegarder la grille.', type: 'alert' });
+      addNotification({ title: 'Erreur Serveur', message: 'Vérifiez les contraintes horaires (pause 12h-14h30).', type: 'alert' });
     } finally {
       setSaving(false);
     }
@@ -208,12 +128,12 @@ export default function Schedule() {
         <div 
           key={slot.id || `${dayIdx}-${timeStr}`}
           onClick={(e) => { e.stopPropagation(); if(canEdit) { setSelectedSlot(slot); setShowEditModal(true); } }}
-          className={`absolute inset-x-1 top-0.5 p-3 rounded-2xl border-l-[6px] shadow-sm z-20 ${colorSet.bg} ${colorSet.border} ${colorSet.text} ${canEdit ? 'cursor-pointer hover:brightness-95 hover:scale-[1.02] active:scale-95 transition-all' : ''} overflow-hidden group/slot`}
+          className={`absolute inset-x-1 top-0.5 p-3 rounded-2xl border-l-[6px] shadow-sm z-20 ${colorSet.bg} ${colorSet.border} ${colorSet.text} ${canEdit ? 'cursor-pointer hover:brightness-95 hover:scale-[1.01] transition-all' : ''} overflow-hidden group/slot`}
           style={{ height: `calc(${duration} * 100% - 4px)` }}
         >
           <div className="flex justify-between items-start mb-1">
-            <p className="text-[10px] font-black uppercase leading-none italic truncate flex-1">{slot.subject}</p>
-            {canEdit && <Edit3 size={10} className="opacity-0 group-hover/slot:opacity-100 transition-opacity shrink-0" />}
+            <p className="text-[10px] font-black uppercase leading-tight italic truncate flex-1">{slot.subject}</p>
+            {canEdit && <Edit3 size={10} className="opacity-0 group-hover/slot:opacity-100 transition-opacity" />}
           </div>
           <div className="space-y-1 opacity-90">
             <p className="text-[8px] font-bold truncate flex items-center gap-1.5"><MapPin size={10} /> {slot.room}</p>
@@ -240,9 +160,14 @@ export default function Schedule() {
       <div 
         onClick={() => {
           if (canEdit) {
+            const startIdx = TIME_SLOTS.indexOf(timeStr);
+            const limit = timeStr < "12:00" ? "12:00" : "18:30";
+            let defaultEnd = TIME_SLOTS[startIdx + 4] || limit;
+            if (defaultEnd > limit) defaultEnd = limit;
+
             setSelectedSlot({ 
               day: dayIdx, startTime: timeStr, 
-              endTime: TIME_SLOTS[TIME_SLOTS.indexOf(timeStr) + 3] || (timeStr < "12:00" ? "12:00" : "18:30"), 
+              endTime: defaultEnd, 
               subject: '', room: '', teacher: '', color: CATEGORY_COLORS[0].hex, className: currentClassName 
             });
             setShowEditModal(true);
@@ -265,72 +190,50 @@ export default function Schedule() {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-8 animate-fade-in pb-32 px-4">
-      {/* Header Widget */}
+      {/* Header UI */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="flex items-center gap-6">
            <div className="w-16 h-16 bg-slate-900 dark:bg-slate-800 text-white rounded-[2rem] flex items-center justify-center shadow-xl transform -rotate-3"><CalendarIcon size={28} /></div>
            <div>
-              <h2 className="text-4xl font-black text-slate-900 dark:text-white italic uppercase tracking-tighter leading-none">Emploi du temps</h2>
+              <h2 className="text-4xl font-black text-slate-900 dark:text-white italic uppercase tracking-tighter leading-none">Planning</h2>
               <div className="flex items-center gap-4 mt-3">
                  <span className="px-3 py-1 bg-brand-50 text-brand text-[9px] font-black uppercase rounded-lg border border-brand-100">{currentClassName}</span>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic flex items-center gap-2">
+                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest italic flex items-center gap-2">
                    <Clock size={12}/> Grille Officielle ESP
                  </span>
               </div>
            </div>
         </div>
 
-        {canEdit && (
-          <div className="flex flex-wrap gap-3">
-             <input type="file" ref={importExcelRef} onChange={handleImportExcel} className="hidden" accept=".xlsx,.xls" />
+        <div className="flex flex-wrap gap-3">
              <button 
-                onClick={() => importExcelRef.current?.click()} 
+                onClick={handleShareEmail}
                 className="bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 px-8 py-4 rounded-3xl text-[11px] font-black uppercase tracking-widest flex items-center gap-3 shadow-soft hover:shadow-premium hover:-translate-y-1 transition-all italic"
              >
-                <FileSpreadsheet size={20} className="text-emerald-500" /> Importer Excel
+                <Mail size={20} className="text-brand" /> Diffuser par Email
              </button>
 
-             {hasUnsavedChanges && (
+             {canEdit && hasUnsavedChanges && (
                 <button 
                   onClick={handlePublish} 
                   disabled={saving} 
-                  className="bg-brand text-white px-10 py-4 rounded-3xl text-[11px] font-black uppercase tracking-widest shadow-premium flex items-center gap-3 animate-pulse active:scale-95 transition-all"
+                  className="bg-brand text-white px-10 py-4 rounded-3xl text-[11px] font-black uppercase tracking-widest shadow-premium flex items-center gap-3 animate-pulse transition-all"
                 >
-                  {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />} Publier les modifications
+                  {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />} Enregistrer les changements
                 </button>
              )}
-          </div>
-        )}
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-4">
-          <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
-              <Coffee size={16} className="text-amber-500" />
-              <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Pause : 12h00 — 14h30</span>
-          </div>
-          <div className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
-              <Moon size={16} className="text-indigo-500" />
-              <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Limite : 18h30 Max</span>
-          </div>
-      </div>
-
-      {/* Grid Container */}
       <div className="bg-white dark:bg-slate-900 rounded-[3.5rem] shadow-premium border border-slate-50 dark:border-slate-800 overflow-hidden">
         <div className="overflow-x-auto custom-scrollbar">
           <div className="min-w-[1200px]">
-             {/* Days Header */}
              <div className="grid grid-cols-[120px_repeat(6,1fr)] bg-slate-50 dark:bg-slate-800/50">
-                <div className="h-20 flex items-center justify-center border-r border-slate-100 dark:border-slate-800">
-                   <Clock size={20} className="text-slate-300" />
-                </div>
+                <div className="h-20 flex items-center justify-center border-r border-slate-100 dark:border-slate-800"><Clock size={20} className="text-slate-300" /></div>
                 {DAYS.map(day => (
-                  <div key={day} className="h-20 flex items-center justify-center font-black italic uppercase text-[11px] tracking-widest text-slate-900 dark:text-white border-r border-slate-100 dark:border-slate-800 last:border-0">
-                    {day}
-                  </div>
+                  <div key={day} className="h-20 flex items-center justify-center font-black italic uppercase text-[11px] tracking-widest text-slate-900 dark:text-white border-r border-slate-100 dark:border-slate-800 last:border-0">{day}</div>
                 ))}
              </div>
-
-             {/* Time Rows */}
              <div className="relative">
                 {TIME_SLOTS.map((time) => (
                   <div key={time} className="grid grid-cols-[120px_repeat(6,1fr)] h-20 group">
@@ -349,93 +252,88 @@ export default function Schedule() {
         </div>
       </div>
 
-      {/* Modern Editor Modal */}
       <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title={selectedSlot?.id && !selectedSlot.id.toString().startsWith('temp-') ? "Modifier la séance" : "Programmer un cours"}>
         {selectedSlot && (
           <form onSubmit={(e) => {
             e.preventDefault();
             const slot = selectedSlot as ScheduleSlot;
-            // Si c'est une modification d'un slot existant (par son id)
-            if (selectedSlot.id) {
-              setSlots(prev => prev.map(s => s.id === slot.id ? slot : s));
-            } else {
-              setSlots(prev => [...prev, { ...slot, id: `temp-${Date.now()}` }]);
-            }
+            if (selectedSlot.id) setSlots(prev => prev.map(s => s.id === slot.id ? slot : s));
+            else setSlots(prev => [...prev, { ...slot, id: `temp-${Date.now()}` }]);
             setHasUnsavedChanges(true);
             setShowEditModal(false);
-          }} className="space-y-6 py-2">
+          }} className="space-y-6">
             
             <div className="space-y-3">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic flex items-center gap-2">
-                <BookOpen size={14}/> Module / Groupe
-              </label>
-              <input required value={selectedSlot.subject} onChange={e => setSelectedSlot({...selectedSlot, subject: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-[1.5rem] font-bold italic border-none focus:ring-4 focus:ring-brand-50 transition-all" placeholder="ex: Réseaux / Gr3" />
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic flex items-center gap-2"><BookOpen size={14}/> Module / Matière</label>
+              <input required value={selectedSlot.subject} onChange={e => setSelectedSlot({...selectedSlot, subject: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic border-none focus:ring-4 focus:ring-brand-50 transition-all outline-none" />
             </div>
             
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic flex items-center gap-2">
-                   <MapPin size={14}/> Salle
-                </label>
-                <input required value={selectedSlot.room} onChange={e => setSelectedSlot({...selectedSlot, room: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-[1.5rem] font-bold italic border-none focus:ring-4 focus:ring-brand-50 transition-all" placeholder="DGE-102" />
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic flex items-center gap-2"><MapPin size={14}/> Salle</label>
+                <input required value={selectedSlot.room} onChange={e => setSelectedSlot({...selectedSlot, room: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic border-none outline-none" />
               </div>
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic flex items-center gap-2">
-                   <UserCheck size={14}/> Enseignant
-                </label>
-                <input required value={selectedSlot.teacher} onChange={e => setSelectedSlot({...selectedSlot, teacher: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-[1.5rem] font-bold italic border-none focus:ring-4 focus:ring-brand-50 transition-all" placeholder="Dr. SOW" />
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic flex items-center gap-2"><UserCheck size={14}/> Professeur</label>
+                <input required value={selectedSlot.teacher} onChange={e => setSelectedSlot({...selectedSlot, teacher: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic border-none outline-none" />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Durée standard</label>
+              <div className="flex gap-4">
+                 <button 
+                  type="button" 
+                  onClick={() => {
+                    const idx = TIME_SLOTS.indexOf(selectedSlot.startTime!);
+                    const limit = selectedSlot.startTime! < "12:00" ? "12:00" : "18:30";
+                    const end = TIME_SLOTS[idx + 4] || limit;
+                    setSelectedSlot({...selectedSlot, endTime: end > limit ? limit : end});
+                  }}
+                  className={`flex-1 py-4 rounded-2xl text-[11px] font-black uppercase transition-all ${selectedSlot.endTime === TIME_SLOTS[TIME_SLOTS.indexOf(selectedSlot.startTime!) + 4] ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}
+                 >
+                   2 Heures
+                 </button>
+                 <button 
+                  type="button" 
+                  onClick={() => {
+                    const idx = TIME_SLOTS.indexOf(selectedSlot.startTime!);
+                    const limit = selectedSlot.startTime! < "12:00" ? "12:00" : "18:30";
+                    const end = TIME_SLOTS[idx + 8] || limit;
+                    setSelectedSlot({...selectedSlot, endTime: end > limit ? limit : end});
+                  }}
+                  className={`flex-1 py-4 rounded-2xl text-[11px] font-black uppercase transition-all ${selectedSlot.endTime === TIME_SLOTS[TIME_SLOTS.indexOf(selectedSlot.startTime!) + 8] ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-50 text-slate-400'}`}
+                 >
+                   4 Heures
+                 </button>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-6">
                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Heure de début</label>
-                  <select value={selectedSlot.startTime} onChange={e => setSelectedSlot({...selectedSlot, startTime: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-[1.5rem] font-black text-[11px] uppercase border-none outline-none cursor-pointer">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Heure début</label>
+                  <select value={selectedSlot.startTime} onChange={e => {
+                    const start = e.target.value;
+                    const idx = TIME_SLOTS.indexOf(start);
+                    const limit = start < "12:00" ? "12:00" : "18:30";
+                    const nextEnd = TIME_SLOTS[idx + 4] || limit;
+                    setSelectedSlot({...selectedSlot, startTime: start, endTime: nextEnd > limit ? limit : nextEnd});
+                  }} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-black text-[11px] uppercase border-none outline-none">
                     {validStartTimes.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                </div>
                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Heure de fin</label>
-                  <select value={selectedSlot.endTime} onChange={e => setSelectedSlot({...selectedSlot, endTime: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-[1.5rem] font-black text-[11px] uppercase border-none outline-none cursor-pointer">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Heure fin</label>
+                  <select value={selectedSlot.endTime} onChange={e => setSelectedSlot({...selectedSlot, endTime: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-black text-[11px] uppercase border-none outline-none">
                     {validEndTimes(selectedSlot.startTime || "08:00").map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                </div>
             </div>
 
-            <div className="space-y-4">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Type de séance</label>
-              <div className="flex gap-4">
-                {CATEGORY_COLORS.map(c => (
-                  <button 
-                    key={c.hex} 
-                    type="button" 
-                    onClick={() => setSelectedSlot({...selectedSlot, color: c.hex})} 
-                    className={`w-12 h-12 rounded-2xl transition-all flex items-center justify-center ${selectedSlot.color === c.hex ? 'ring-4 ring-offset-4 ring-slate-100 scale-110 shadow-lg' : 'opacity-40 hover:opacity-100'}`} 
-                    style={{ backgroundColor: c.hex }} 
-                    title={c.name}
-                  >
-                    {selectedSlot.color === c.hex && <CheckCircle2 size={24} className="text-white" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="flex gap-4 pt-8">
-               <button type="submit" className="flex-1 bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase text-[12px] tracking-widest shadow-xl italic active:scale-95 transition-all">
-                 Enregistrer
-               </button>
+               <button type="submit" className="flex-1 bg-slate-900 text-white py-5 rounded-[2.5rem] font-black uppercase text-[12px] tracking-widest shadow-xl italic active:scale-95 transition-all">Enregistrer</button>
                {selectedSlot.id && (
-                 <button 
-                   type="button" 
-                   onClick={() => { 
-                     setSlots(prev => prev.filter(s => s.id !== selectedSlot.id)); 
-                     setHasUnsavedChanges(true); 
-                     setShowEditModal(false); 
-                   }} 
-                   className="p-5 bg-rose-50 text-rose-500 rounded-[1.5rem] hover:bg-rose-500 hover:text-white transition-all shadow-sm active:scale-90"
-                 >
-                   <Trash2 size={24}/>
-                 </button>
+                 <button type="button" onClick={() => { setSlots(prev => prev.filter(s => s.id !== selectedSlot.id)); setHasUnsavedChanges(true); setShowEditModal(false); }} className="p-5 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all"><Trash2 size={24}/></button>
                )}
             </div>
           </form>
