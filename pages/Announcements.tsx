@@ -5,7 +5,7 @@ import { API } from '../services/api';
 import { 
   Plus, Trash2, Loader2, Pencil, Megaphone, Search, Bookmark, Maximize2,
   ExternalLink, MessageCircle, Mail, Link as LinkIcon, Copy, Share2, AlertCircle, X,
-  Globe, Video, FileText, Link2
+  Globe, Video, FileText, Link2, PlusCircle
 } from 'lucide-react';
 import { UserRole, Announcement, AnnouncementPriority, ExternalLink as ExtLinkType, ClassGroup } from '../types';
 import Modal from '../components/Modal';
@@ -26,7 +26,7 @@ export default function Announcements() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newAnn, setNewAnn] = useState({ 
     title: '', content: '', priority: 'normal' as AnnouncementPriority, 
-    className: '', links: [] as ExtLinkType[] 
+    className: 'Général', links: [] as ExtLinkType[] 
   });
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -62,12 +62,32 @@ export default function Announcements() {
     API.sharing.whatsapp(text);
   };
 
+  const handleAddLink = () => {
+    setNewAnn({ ...newAnn, links: [...newAnn.links, { label: '', url: '' }] });
+  };
+
+  const handleRemoveLink = (index: number) => {
+    const updatedLinks = newAnn.links.filter((_, i) => i !== index);
+    setNewAnn({ ...newAnn, links: updatedLinks });
+  };
+
+  const handleLinkChange = (index: number, field: 'label' | 'url', value: string) => {
+    const updatedLinks = [...newAnn.links];
+    updatedLinks[index] = { ...updatedLinks[index], [field]: value };
+    setNewAnn({ ...newAnn, links: updatedLinks });
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      if (editingId) await API.announcements.update(editingId, newAnn);
-      else await API.announcements.create(newAnn);
+      // Filtrer les liens vides
+      const cleanedLinks = newAnn.links.filter(l => l.label.trim() && l.url.trim());
+      const payload = { ...newAnn, links: cleanedLinks };
+
+      if (editingId) await API.announcements.update(editingId, payload);
+      else await API.announcements.create(payload);
+      
       setIsModalOpen(false);
       addNotification({ title: 'Succès', message: 'Annonce publiée.', type: 'success' });
       fetchAll();
@@ -130,7 +150,19 @@ export default function Announcements() {
                   <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{ann.className} • {new Date(ann.date).toLocaleDateString()}</span>
                 </div>
                 <h3 className="text-2xl font-black text-gray-900 dark:text-white italic tracking-tighter mb-5 uppercase">{ann.title}</h3>
-                <p className="text-gray-600 dark:text-gray-300 italic text-sm line-clamp-3 leading-relaxed mb-8">{ann.content}</p>
+                <p className="text-gray-600 dark:text-gray-300 italic text-sm line-clamp-3 leading-relaxed mb-6">{ann.content}</p>
+                
+                {/* Section Liens sur l'annonce */}
+                {ann.links && ann.links.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-8">
+                    {ann.links.map((link, idx) => (
+                      <a key={idx} href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-xl text-[10px] font-black uppercase tracking-widest text-primary-500 hover:bg-primary-500 hover:text-white transition-all border border-gray-100 dark:border-gray-700">
+                        <Link2 size={12} /> {link.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
+
                 <button onClick={() => setViewingAnn(ann)} className="text-[10px] font-black uppercase text-primary-500 flex items-center gap-2 tracking-widest hover:underline">Lire la suite <Maximize2 size={14} /></button>
               </div>
               
@@ -151,29 +183,66 @@ export default function Announcements() {
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Éditer l'annonce" : "Nouvelle Annonce"}>
         <form onSubmit={handleSave} className="space-y-6">
-          <input required placeholder="Titre..." value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl font-bold italic" />
-          <textarea required placeholder="Message..." rows={6} value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} className="w-full p-4 bg-gray-50 rounded-2xl font-bold italic" />
+          <input required placeholder="Titre..." value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic outline-none focus:ring-2 focus:ring-primary-50" />
+          <textarea required placeholder="Message..." rows={5} value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic outline-none focus:ring-2 focus:ring-primary-50" />
+          
           <div className="grid grid-cols-2 gap-4">
-            <select value={newAnn.priority} onChange={e => setNewAnn({...newAnn, priority: e.target.value as any})} className="p-4 bg-gray-50 rounded-2xl font-black text-[10px] uppercase">
-              <option value="normal">Normal</option><option value="important">Important</option><option value="urgent">Urgent</option>
+            <select value={newAnn.priority} onChange={e => setNewAnn({...newAnn, priority: e.target.value as any})} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase outline-none">
+              <option value="normal">Priorité : Normal</option><option value="important">Priorité : Important</option><option value="urgent">Priorité : Urgent</option>
             </select>
-            <select value={newAnn.className} onChange={e => setNewAnn({...newAnn, className: e.target.value})} className="p-4 bg-gray-50 rounded-2xl font-black text-[10px] uppercase">
+            <select value={newAnn.className} onChange={e => setNewAnn({...newAnn, className: e.target.value})} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase outline-none">
               <option value="Général">Toute l'école</option>
               {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
           </div>
-          <button type="submit" disabled={submitting} className="w-full py-5 bg-primary-500 text-white rounded-[2.5rem] font-black uppercase text-[11px] tracking-widest shadow-xl">
-            {submitting ? <Loader2 className="animate-spin mx-auto" /> : "Publier l'annonce"}
+
+          {/* Gestion des liens dans le modal */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Liens utiles / Ressources</label>
+              <button type="button" onClick={handleAddLink} className="text-primary-500 hover:text-primary-600 flex items-center gap-1 text-[10px] font-black uppercase">
+                <PlusCircle size={14} /> Ajouter un lien
+              </button>
+            </div>
+            {newAnn.links.map((link, idx) => (
+              <div key={idx} className="flex gap-2 animate-fade-in">
+                <input placeholder="Libellé (ex: Support PDF)" value={link.label} onChange={e => handleLinkChange(idx, 'label', e.target.value)} className="flex-1 p-3 bg-gray-100 dark:bg-gray-900 rounded-xl text-[11px] font-bold outline-none" />
+                <input placeholder="https://..." value={link.url} onChange={e => handleLinkChange(idx, 'url', e.target.value)} className="flex-1 p-3 bg-gray-100 dark:bg-gray-900 rounded-xl text-[11px] font-bold outline-none" />
+                <button type="button" onClick={() => handleRemoveLink(idx)} className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"><X size={16} /></button>
+              </div>
+            ))}
+          </div>
+
+          <button type="submit" disabled={submitting} className="w-full py-5 bg-primary-500 text-white rounded-[2.5rem] font-black uppercase text-[11px] tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
+            {submitting ? <Loader2 className="animate-spin mx-auto" /> : (editingId ? "Mettre à jour" : "Publier l'annonce")}
           </button>
         </form>
       </Modal>
 
       {viewingAnn && (
         <Modal isOpen={!!viewingAnn} onClose={() => setViewingAnn(null)} title={viewingAnn.title}>
-           <div className="space-y-6 italic">
-              <p className="text-gray-600 leading-relaxed text-lg">{viewingAnn.content}</p>
-              <div className="pt-6 border-t flex justify-between items-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                 <span>Par {viewingAnn.author}</span>
+           <div className="space-y-8 italic">
+              <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg whitespace-pre-wrap">{viewingAnn.content}</p>
+              
+              {viewingAnn.links && viewingAnn.links.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Ressources jointes :</p>
+                  <div className="flex flex-col gap-2">
+                    {viewingAnn.links.map((link, idx) => (
+                      <a key={idx} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all border border-transparent hover:border-primary-200">
+                        <span className="font-bold text-gray-900 dark:text-white text-sm">{link.label}</span>
+                        <ExternalLink size={16} className="text-primary-500" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-8 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                 <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center text-white text-[8px]">{viewingAnn.author?.charAt(0)}</div>
+                    <span>{viewingAnn.author}</span>
+                 </div>
                  <span>{new Date(viewingAnn.date).toLocaleDateString()}</span>
               </div>
            </div>

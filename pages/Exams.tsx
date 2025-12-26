@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { API } from '../services/api';
 import { 
   Clock, MapPin, Plus, Trash2, Loader2, Pencil, 
-  Calendar as CalendarIcon, Copy, Share2, Timer
+  Calendar as CalendarIcon, Copy, Share2, Timer, FileText, ChevronRight
 } from 'lucide-react';
 import { UserRole, Exam, ClassGroup } from '../types';
 import Modal from '../components/Modal';
@@ -21,7 +21,7 @@ export default function Exams() {
   
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ 
-    subject: '', date: '', time: '', room: '', className: ''
+    subject: '', date: '', time: '', room: '', className: '', duration: '2h', notes: ''
   });
 
   const isAdmin = user?.role === UserRole.ADMIN;
@@ -46,13 +46,13 @@ export default function Exams() {
   }, [fetchExams]);
 
   const handleCopy = useCallback((exam: Exam) => {
-    const text = `📅 Examen: ${exam.subject}\n📍 Salle: ${exam.room}\n🕒 Date: ${new Date(exam.date).toLocaleString()}`;
+    const text = `📅 Examen: ${exam.subject}\n📍 Salle: ${exam.room}\n🕒 Date: ${new Date(exam.date).toLocaleString()}\n📝 Notes: ${exam.notes || 'Aucune'}`;
     navigator.clipboard.writeText(text);
     addNotification({ title: 'Copié', message: 'Détails copiés.', type: 'success' });
   }, [addNotification]);
 
   const handleShare = useCallback((exam: Exam) => {
-    const text = `🚨 *EXAMEN JANGHUP*\n\n📚 *Matière :* ${exam.subject}\n📍 *Salle :* ${exam.room}\n📅 *Date :* ${new Date(exam.date).toLocaleString()}`;
+    const text = `🚨 *EXAMEN JANGHUP*\n\n📚 *Matière :* ${exam.subject}\n📍 *Salle :* ${exam.room}\n📅 *Date :* ${new Date(exam.date).toLocaleString()}\n⏱️ *Durée :* ${exam.duration}\n📝 *Notes :* ${exam.notes || 'N/A'}`;
     API.sharing.whatsapp(text);
   }, []);
 
@@ -81,11 +81,14 @@ export default function Exams() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 border-b border-gray-100 dark:border-gray-800 pb-10">
         <div className="flex items-center gap-6">
            <div className="w-16 h-16 bg-orange-500 text-white rounded-3xl flex items-center justify-center shadow-lg"><CalendarIcon size={32} /></div>
-           <h2 className="text-4xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter">Examens</h2>
+           <div>
+              <h2 className="text-4xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter leading-none">Examens</h2>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">Calendrier des évaluations</p>
+           </div>
         </div>
         {canPost && (
-          <button onClick={() => { setEditingId(null); setFormData({ subject: '', date: '', time: '', room: '', className: isAdmin ? '' : (user?.className || '') }); setIsModalOpen(true); }} className="bg-gray-900 dark:bg-black text-white px-10 py-5 rounded-2xl font-black uppercase text-[11px] tracking-widest italic flex items-center gap-2 shadow-xl hover:scale-105 transition-all">
-            <Plus size={20} /> Programmer
+          <button onClick={() => { setEditingId(null); setFormData({ subject: '', date: '', time: '', room: '', className: isAdmin ? '' : (user?.className || ''), duration: '2h', notes: '' }); setIsModalOpen(true); }} className="bg-gray-900 dark:bg-black text-white px-10 py-5 rounded-2xl font-black uppercase text-[11px] tracking-widest italic flex items-center gap-2 shadow-xl hover:scale-105 transition-all">
+            <Plus size={20} /> Programmer une épreuve
           </button>
         )}
       </div>
@@ -96,58 +99,115 @@ export default function Exams() {
           const canManage = isAdmin || (user?.id === exam.user_id);
 
           return (
-            <div key={exam.id} className="bg-white dark:bg-gray-900 rounded-[3.5rem] p-8 shadow-soft border-2 border-transparent hover:border-orange-100 transition-all flex flex-col md:flex-row gap-8 items-center relative overflow-hidden">
+            <div key={exam.id} className="bg-white dark:bg-gray-900 rounded-[3.5rem] p-8 md:p-10 shadow-soft border-2 border-transparent hover:border-orange-100 transition-all flex flex-col md:flex-row gap-8 items-start relative overflow-hidden">
               <div className="absolute top-0 left-0 w-2.5 h-full bg-orange-500" />
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-orange-50 text-orange-600">Planifié</span>
-                  <span className="text-[10px] font-black text-gray-400 uppercase">{exam.className}</span>
+                  <span className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-orange-50 dark:bg-orange-900/20 text-orange-600">Planifié</span>
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{exam.className}</span>
                 </div>
                 <h3 className="text-3xl font-black italic text-gray-900 dark:text-white uppercase tracking-tighter mb-4">{exam.subject}</h3>
-                <div className="flex gap-6 text-sm font-bold text-gray-500">
-                  <div className="flex items-center gap-2"><Clock size={16}/> {examDate.toLocaleString()}</div>
-                  <div className="flex items-center gap-2"><MapPin size={16}/> {exam.room}</div>
+                <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm font-bold text-gray-500 mb-6">
+                  <div className="flex items-center gap-2"><Clock size={16} className="text-orange-500" /> {examDate.toLocaleString('fr-FR', { day:'numeric', month:'long', hour:'2-digit', minute:'2-digit'})}</div>
+                  <div className="flex items-center gap-2"><Timer size={16} className="text-orange-500" /> Durée: {exam.duration}</div>
+                  <div className="flex items-center gap-2"><MapPin size={16} className="text-orange-500" /> {exam.room}</div>
                 </div>
+                
+                {exam.notes && (
+                  <div className="bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-700">
+                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-2 flex items-center gap-2"><FileText size={12}/> Consignes :</p>
+                    <p className="text-sm font-medium italic text-gray-600 dark:text-gray-300 leading-relaxed">{exam.notes}</p>
+                  </div>
+                )}
               </div>
               
-              <div className="flex gap-2 md:pl-8 md:border-l border-gray-100 dark:border-gray-800">
-                <button onClick={() => handleShare(exam)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm"><Share2 size={20}/></button>
-                <button onClick={() => handleCopy(exam)} className="p-4 bg-gray-50 text-gray-500 rounded-2xl hover:bg-gray-900 hover:text-white transition-all shadow-sm"><Copy size={20}/></button>
+              <div className="flex gap-2 md:flex-col md:pl-8 md:border-l border-gray-100 dark:border-gray-800 self-center">
+                <button onClick={() => handleShare(exam)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm" title="WhatsApp"><Share2 size={20}/></button>
+                <button onClick={() => handleCopy(exam)} className="p-4 bg-gray-50 text-gray-500 rounded-2xl hover:bg-gray-900 hover:text-white transition-all shadow-sm" title="Copier"><Copy size={20}/></button>
                 {canManage && (
                   <>
-                    <button onClick={() => { setEditingId(exam.id); setFormData({ subject: exam.subject, date: examDate.toISOString().split('T')[0], time: examDate.toTimeString().slice(0,5), room: exam.room, className: exam.className }); setIsModalOpen(true); }} className="p-4 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Pencil size={20}/></button>
-                    <button onClick={() => handleDelete(exam.id)} className="p-4 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm"><Trash2 size={20}/></button>
+                    <button onClick={() => { setEditingId(exam.id); setFormData({ subject: exam.subject, date: examDate.toISOString().split('T')[0], time: examDate.toTimeString().slice(0,5), room: exam.room, className: exam.className, duration: exam.duration || '2h', notes: exam.notes || '' }); setIsModalOpen(true); }} className="p-4 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Modifier"><Pencil size={20}/></button>
+                    <button onClick={() => handleDelete(exam.id)} className="p-4 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm" title="Supprimer"><Trash2 size={20}/></button>
                   </>
                 )}
               </div>
             </div>
           );
         })}
+        {filteredExams.length === 0 && (
+          <div className="py-24 text-center bg-white dark:bg-gray-900 rounded-[4rem] border-2 border-dashed border-gray-100 dark:border-gray-800">
+             <CalendarIcon size={48} className="mx-auto text-gray-100 mb-6" />
+             <p className="text-sm font-black text-gray-400 uppercase tracking-widest italic">Aucun examen programmé</p>
+          </div>
+        )}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Éditer" : "Créer"}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Éditer l'épreuve" : "Nouvelle Évaluation"}>
         <form onSubmit={async (e) => {
           e.preventDefault();
           setSubmitting(true);
           try {
             const isoDate = new Date(`${formData.date}T${formData.time}`).toISOString();
-            const payload = { ...formData, date: isoDate, className: isAdmin ? formData.className : (user?.className || 'Général') };
+            const payload = { 
+              subject: formData.subject,
+              date: isoDate,
+              duration: formData.duration,
+              room: formData.room,
+              notes: formData.notes,
+              className: isAdmin ? formData.className : (user?.className || 'Général') 
+            };
+            
             if (editingId) await API.exams.update(editingId, payload);
             else await API.exams.create(payload);
+            
             fetchExams();
             setIsModalOpen(false);
-            addNotification({ title: 'Succès', message: 'Mis à jour.', type: 'success' });
-          } catch (error) { addNotification({ title: 'Erreur', message: "Échec.", type: 'alert' }); }
+            addNotification({ title: 'Succès', message: 'Examen enregistré.', type: 'success' });
+          } catch (error) { addNotification({ title: 'Erreur', message: "Échec de l'enregistrement.", type: 'alert' }); }
           finally { setSubmitting(false); }
         }} className="space-y-6">
-          <input required placeholder="Matière" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic" />
-          <div className="grid grid-cols-2 gap-4">
-            <input required type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl" />
-            <input required type="time" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl" />
+          <div className="space-y-4">
+             <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Matière / Module</label>
+             <input required placeholder="ex: Algorithmique & Programmation" value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic outline-none focus:ring-2 focus:ring-orange-500" />
           </div>
-          <input required placeholder="Salle" value={formData.room} onChange={e => setFormData({...formData, room: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic" />
-          <button type="submit" disabled={submitting} className="w-full py-5 bg-orange-500 text-white rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-xl">
-            {submitting ? <Loader2 className="animate-spin mx-auto"/> : "Enregistrer"}
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Date</label>
+              <input required type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold outline-none" />
+            </div>
+            <div className="space-y-4">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Heure de début</label>
+              <input required type="time" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold outline-none" />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Durée (ex: 2h)</label>
+              <input required placeholder="2h" value={formData.duration} onChange={e => setFormData({...formData, duration: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic outline-none" />
+            </div>
+            <div className="space-y-4">
+              <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Salle / Lieu</label>
+              <input required placeholder="Salle 103" value={formData.room} onChange={e => setFormData({...formData, room: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic outline-none" />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+             <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Notes / Instructions (facultatif)</label>
+             <textarea placeholder="ex: Calculatrice autorisée, apporter sa carte d'étudiant..." rows={3} value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic outline-none focus:ring-2 focus:ring-orange-500" />
+          </div>
+
+          <div className="space-y-4">
+             <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Cible</label>
+             <select required value={formData.className} onChange={e => setFormData({...formData, className: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase outline-none">
+                <option value="Général">Tous (Général)</option>
+                {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+             </select>
+          </div>
+
+          <button type="submit" disabled={submitting} className="w-full py-5 bg-orange-500 text-white rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
+            {submitting ? <Loader2 className="animate-spin mx-auto"/> : (editingId ? "Enregistrer les modifications" : "Programmer l'épreuve")}
           </button>
         </form>
       </Modal>
