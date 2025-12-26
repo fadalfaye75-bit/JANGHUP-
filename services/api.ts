@@ -2,10 +2,6 @@
 import { supabase } from './supabaseClient';
 import { User, Announcement, UserRole, ClassGroup, Exam, Poll, MeetLink, ScheduleSlot, ActivityLog, AppNotification, ScheduleFile, Grade, DirectMessage } from '../types';
 
-/**
- * API Service optimisé pour la production (Vercel Ready).
- * Réduction des payloads et gestion d'erreurs avancée.
- */
 export const API = {
   auth: {
     canPost: (u: User | null) => [UserRole.ADMIN, UserRole.DELEGATE].includes(u?.role as UserRole),
@@ -14,7 +10,6 @@ export const API = {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
       if (error) throw error;
       
-      // Retry logic exponentiel pour la synchronisation du profil
       let profile = null;
       for (let i = 0; i < 5; i++) {
         const { data: p } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
@@ -45,18 +40,21 @@ export const API = {
     },
 
     deleteUser: async (id: string) => {
+      // Suppression du profil dans la table publique (Auth nécessite l'admin SDK, donc on gère au moins le profil ici)
       const { error } = await supabase.from('profiles').delete().eq('id', id);
       if (error) throw error;
     },
 
-    createUser: async (user: any) => {
-       const { data, error } = await supabase.from('profiles').insert([{
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        className: user.className,
-        schoolName: user.schoolName,
-        themeColor: '#0ea5e9'
+    createUser: async (userData: any) => {
+      // Note: Pour créer un compte complet (Auth), il faut normalement utiliser signUp.
+      // Ici on insère dans profiles pour la gestion admin locale.
+      const { data, error } = await supabase.from('profiles').insert([{
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        className: userData.className,
+        schoolName: userData.schoolName || 'ESP Dakar',
+        themeColor: '#87CEEB'
       }]).select().single();
       if (error) throw error;
       return data;
@@ -188,8 +186,10 @@ export const API = {
   },
 
   schedules: {
-    list: async (): Promise<ScheduleFile[]> => {
-      const { data, error } = await supabase.from('schedule_files').select('*').order('uploadDate', { ascending: false });
+    list: async (className?: string): Promise<any[]> => {
+      let query = supabase.from('schedule_files').select('*').order('created_at', { ascending: false });
+      if (className) query = query.eq('classname', className);
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
@@ -202,6 +202,52 @@ export const API = {
       await supabase.from('schedule_slots').delete().eq('classname', className);
       const { error } = await supabase.from('schedule_slots').insert(slots.map(s => ({ ...s, classname: className })));
       if (error) throw error;
+    },
+    uploadFile: async (file: File, className: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `schedule_${className.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('schedules')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('schedules')
+        .getPublicUrl(fileName);
+
+      const { error: dbError } = await supabase.from('schedule_files').insert([{
+        name: file.name,
+        url: publicUrl,
+        classname: className,
+        uploaded_by: user?.id
+      }]);
+
+      if (dbError) throw dbError;
+    },
+    deleteFile: async (id: string) => {
+      const { error } = await supabase.from('schedule_files').delete().eq('id', id);
+      if (error) throw error;
+    }
+  },
+
+  sharing: {
+    whatsapp: (text: string) => {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    },
+    email: (to: string, subject: string, body: string) => {
+      const recipient = to?.trim() ? to : 'administration@esp.sn';
+      const mailtoUrl = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      
+      // Solution plus robuste pour mobile et web
+      const link = document.createElement('a');
+      link.href = mailtoUrl;
+      link.target = "_self";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   },
 
@@ -248,7 +294,6 @@ export const API = {
     }
   },
 
-  // Added missing grades endpoint
   grades: {
     list: async (userId?: string): Promise<Grade[]> => {
       const { data, error } = await supabase.from('grades').select('*').eq('user_id', userId);
@@ -257,7 +302,6 @@ export const API = {
     }
   },
 
-  // Added missing messaging endpoint
   messaging: {
     list: async (): Promise<DirectMessage[]> => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -287,12 +331,6 @@ export const API = {
       const { data, error } = await supabase.from('ai_settings').select('*').single();
       if (error) return { isActive: true, verbosity: 'balanced', tone: 'helpful' };
       return data;
-    }
-  },
-
-  sharing: {
-    whatsapp: (text: string) => {
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     }
   }
 };

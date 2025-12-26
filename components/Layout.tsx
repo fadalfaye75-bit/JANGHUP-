@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Megaphone, Calendar, GraduationCap, Video, 
   BarChart2, Search, LogOut, Menu, Moon, Sun, 
   ShieldCheck, UserCircle, Bell, School, 
-  BellRing
+  BellRing, X, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
@@ -20,11 +19,11 @@ export const UserAvatar = React.memo(({ name, color, className = "w-10 h-10", te
     return name.slice(0, 2).toUpperCase();
   }, [name]);
 
-  const bgColor = color || '#0ea5e9';
+  const bgColor = color || '#87CEEB';
 
   return (
     <div 
-      className={`${className} rounded-2xl flex items-center justify-center text-white font-black shadow-lg border-2 border-white dark:border-gray-800 shrink-0 transform hover:rotate-3 transition-transform`}
+      className={`${className} rounded-2xl flex items-center justify-center text-white font-black shadow-sm border-2 border-white dark:border-gray-800 shrink-0 transform hover:scale-105 transition-all`}
       style={{ backgroundColor: bgColor }}
     >
       <span className={textClassName}>{initials}</span>
@@ -38,23 +37,14 @@ export default function Layout() {
   
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isNotifOpen, setNotifOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  const [allData, setAllData] = useState<{anns: any[], exams: any[], schs: any[]}>({anns: [], exams: [], schs: []});
-  const [isDataLoaded, setIsDataLoaded] = useState(false);
-  
   const location = useLocation();
-  const navigate = useNavigate();
   const notifRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLDivElement>(null);
 
-  const themeColor = user?.themeColor || '#0ea5e9';
+  const themeColor = user?.themeColor || '#87CEEB';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) setNotifOpen(false);
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) setIsSearchOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -63,24 +53,7 @@ export default function Layout() {
   useEffect(() => {
     setSidebarOpen(false);
     setNotifOpen(false);
-    setIsSearchOpen(false);
   }, [location]);
-
-  const prefetchSearchData = useCallback(async () => {
-    if (isDataLoaded || !user) return;
-    try {
-      // Fix: Corrected API arguments and methods
-      const [anns, exams, schs] = await Promise.all([
-        API.announcements.list(100),
-        API.exams.list(),
-        API.schedules.list()
-      ]);
-      setAllData({ anns, exams, schs });
-      setIsDataLoaded(true);
-    } catch (e) { 
-      console.warn("[Search Prefetch] Skipped."); 
-    }
-  }, [isDataLoaded, user]);
 
   const navItems = useMemo(() => {
     const items = [
@@ -98,112 +71,110 @@ export default function Layout() {
   if (!user) return null;
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-200 font-sans overflow-hidden">
+    <div className="flex h-screen bg-neutral-50 dark:bg-slate-950 transition-colors duration-300 font-sans overflow-hidden">
+      {/* Mobile Overlay */}
       {isSidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-gray-900/60 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 z-40 bg-slate-900/40 md:hidden backdrop-blur-md transition-opacity" onClick={() => setSidebarOpen(false)} />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 transform transition-transform duration-300 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-premium md:shadow-none`}>
-        <div className="p-8 h-24 flex-shrink-0 flex items-center gap-4">
-          <div className="w-12 h-12 flex items-center justify-center text-white rounded-[1.2rem] shadow-xl" style={{ backgroundColor: themeColor }}>
-             <School size={28} />
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 transform transition-transform duration-300 md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col shadow-soft`}>
+        <div className="p-8 h-24 flex items-center justify-between border-b border-slate-50 dark:border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 flex items-center justify-center text-white rounded-xl shadow-lg" style={{ backgroundColor: themeColor }}>
+               <School size={22} />
+            </div>
+            <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">JangHup</h1>
           </div>
-          <div className="min-w-0">
-            <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tighter uppercase italic leading-none">JangHup</h1>
-            <p className="text-[8px] font-black uppercase tracking-[0.2em] mt-1 opacity-70" style={{ color: themeColor }}>{user?.schoolName || 'ESP DAKAR'}</p>
-          </div>
+          <button onClick={() => setSidebarOpen(false)} className="md:hidden p-2 text-slate-400">
+            <X size={20} />
+          </button>
         </div>
 
-        <div className="px-6 py-2 flex-1 overflow-y-auto custom-scrollbar">
-          <NavLink to="/profile" className={({ isActive }) => `flex items-center gap-4 mb-10 p-5 rounded-[2.2rem] transition-all border-2 ${isActive ? 'bg-gray-50/50 border-gray-200 dark:bg-gray-800/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 border-transparent shadow-sm'}`}>
-             <UserAvatar name={user?.name || "U"} color={themeColor} className="w-12 h-12" textClassName="text-xl" />
-             <div className="flex-1 min-w-0">
-               <p className="text-sm font-black truncate text-gray-900 dark:text-white italic">{user?.name.split(' ')[0]}</p>
-               <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest mt-0.5">{user?.className}</p>
-             </div>
-          </NavLink>
-
-          <nav className="space-y-1.5 pb-10">
+        <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-8">
+          <nav className="space-y-2">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
-                className={({ isActive }) => `flex items-center gap-4 px-6 py-4 text-xs font-black uppercase tracking-widest rounded-2xl transition-all group
-                  ${isActive ? 'text-white shadow-xl italic' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/20'}`}
-                style={({ isActive }) => isActive ? { backgroundColor: themeColor } : {}}
+                className={({ isActive }) => `flex items-center gap-4 px-5 py-4 text-xs font-bold uppercase tracking-widest rounded-2xl transition-all group
+                  ${isActive ? 'bg-brand text-white shadow-premium italic' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
               >
-                <item.icon size={20} className="group-hover:rotate-12 transition-transform" />
+                <item.icon size={20} className={`${location.pathname === item.to ? 'animate-pulse' : ''}`} />
                 <span>{item.label}</span>
               </NavLink>
             ))}
           </nav>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 border-t border-slate-50 dark:border-slate-800">
           <button 
-            onClick={() => { if(window.confirm("Quitter le portail ?")) logout(); }} 
-            className="flex items-center gap-3 w-full px-5 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-red-400 hover:text-white hover:bg-red-500 dark:hover:bg-red-900 rounded-2xl transition-all italic active:scale-95 border border-red-50 dark:border-red-900/30"
+            onClick={() => { if(window.confirm("Quitter JangHup ?")) logout(); }} 
+            className="flex items-center gap-3 w-full px-5 py-4 text-[10px] font-black uppercase tracking-widest text-rose-400 hover:text-white hover:bg-rose-500 rounded-2xl transition-all active:scale-95 italic border border-rose-50 dark:border-rose-900/20"
           >
             <LogOut size={18} /> Déconnexion
           </button>
         </div>
       </aside>
 
+      {/* Main Content */}
       <div className="flex-1 md:ml-72 flex flex-col h-screen overflow-hidden">
-        <header className="h-24 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-100 dark:border-gray-800 flex items-center justify-between px-8 z-20 sticky top-0">
-          <div className="flex items-center gap-6 flex-1 max-w-2xl">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-3 -ml-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl transition-all active:scale-90">
+        <header className="h-20 glass flex items-center justify-between px-8 z-20 sticky top-0 shadow-sm">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all">
               <Menu size={24} />
             </button>
-            
-            <div className="relative flex-1 group hidden sm:block" ref={searchRef}>
-              <div className="relative">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input 
-                  type="text" placeholder="Rechercher sur JangHup..."
-                  onFocus={prefetchSearchData}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-14 pr-12 py-3.5 bg-gray-50 dark:bg-gray-800/50 border-none rounded-2xl text-sm font-bold italic outline-none focus:ring-4 focus:ring-primary-50 transition-all duration-300"
-                />
-              </div>
+            <div className="hidden sm:block">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 italic">Espace Étudiant JangHup</p>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-none mt-1">{user.className} • {user.schoolName || 'ESP Dakar'}</h2>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
              <div className="relative" ref={notifRef}>
-                <button onClick={() => { markAllAsRead(); setNotifOpen(!isNotifOpen); }} className="p-3.5 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all relative active:scale-90">
-                  <Bell size={22} />
-                  {unreadCount > 0 && <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>}
+                <button onClick={() => { markAllAsRead(); setNotifOpen(!isNotifOpen); }} className="p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all relative">
+                  <Bell size={20} />
+                  {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white dark:border-slate-800"></span>}
                 </button>
                 {isNotifOpen && (
-                  <div className="absolute top-full right-0 mt-3 w-80 bg-white dark:bg-gray-900 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in slide-in-from-top-2">
-                    <div className="p-6 border-b border-gray-50 dark:border-gray-800 flex justify-between items-center">
-                       <h4 className="text-xs font-black uppercase tracking-widest italic">Alertes</h4>
-                       <button onClick={() => clearNotifications()} className="text-[9px] font-black text-gray-400 hover:text-red-500 uppercase tracking-widest">Purger</button>
+                  <div className="absolute top-full right-0 mt-3 w-80 bg-white dark:bg-slate-900 rounded-3xl shadow-premium border border-slate-100 dark:border-slate-800 overflow-hidden animate-fade-in">
+                    <div className="p-5 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center">
+                       <h4 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white">Centre d'Alertes</h4>
+                       <button onClick={() => clearNotifications()} className="text-[9px] font-black text-rose-500 hover:underline uppercase">Vider</button>
                     </div>
-                    <div className="max-h-[60vh] overflow-y-auto">
+                    <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
                        {notifications.length > 0 ? notifications.map(n => (
-                         <div key={n.id} className="p-5 border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                            <p className="text-[10px] font-black text-gray-900 dark:text-white leading-tight">{n.title}</p>
-                            <p className="text-[9px] text-gray-400 font-bold mt-1 line-clamp-2">{n.message}</p>
+                         <div key={n.id} className="p-4 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <p className="text-[10px] font-black text-slate-900 dark:text-white mb-1 leading-tight">{n.title}</p>
+                            <p className="text-[9px] text-slate-400 font-medium line-clamp-2">{n.message}</p>
                          </div>
                        )) : (
-                         <div className="p-10 text-center opacity-30 grayscale"><BellRing size={40} className="mx-auto mb-4" /><p className="text-[10px] font-black uppercase tracking-widest">Aucun signal</p></div>
+                         <div className="p-10 text-center opacity-30"><BellRing size={32} className="mx-auto mb-3" /><p className="text-[10px] font-black uppercase tracking-widest">Aucun signal</p></div>
                        )}
                     </div>
                   </div>
                 )}
              </div>
 
-             <button onClick={toggleTheme} className="p-3.5 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all active:scale-90">
-                {isDarkMode ? <Sun size={22} /> : <Moon size={22} />}
+             <button onClick={toggleTheme} className="p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">
+                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
              </button>
+
+             <NavLink to="/profile" className="flex items-center gap-3 pl-2 border-l border-slate-100 dark:border-slate-800 ml-2">
+               <UserAvatar name={user.name} color={themeColor} className="w-10 h-10" />
+               <div className="hidden lg:block">
+                 <p className="text-xs font-black italic text-slate-900 dark:text-white leading-none">{user.name.split(' ')[0]}</p>
+                 <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Mon Compte</p>
+               </div>
+             </NavLink>
           </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
-           <Outlet />
+           <div className="max-w-6xl mx-auto">
+             <Outlet />
+           </div>
         </main>
       </div>
     </div>

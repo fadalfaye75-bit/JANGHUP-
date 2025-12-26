@@ -50,11 +50,19 @@ export default function Polls() {
 
   const handleCopy = (poll: Poll) => {
     navigator.clipboard.writeText(`📊 Sondage JANGHUP: ${poll.question}`);
-    addNotification({ title: 'Copié', message: 'Sujet du sondage copié.', type: 'success' });
+    addNotification({ title: 'Copié', message: 'Question copiée.', type: 'success' });
   };
 
-  const handleShare = (poll: Poll) => {
+  const handleShareWhatsApp = (poll: Poll) => {
     API.sharing.whatsapp(`📊 *Sondage JANGHUP*\n\nQuestion: *${poll.question}*\n\n🎓 _Participez sur la plateforme !_`);
+  };
+
+  const handleShareEmail = (poll: Poll) => {
+    const classObj = classes.find(c => c.name === poll.className);
+    const to = classObj?.email || '';
+    const subject = `📊 NOUVEAU SONDAGE: ${poll.question}`;
+    const body = `Question: ${poll.question}\nOptions: ${poll.options.map(o => o.label).join(', ')}\n\n🎓 Espace JANGHUP ESP`;
+    API.sharing.email(to, subject, body);
   };
 
   const handleVote = async (pollId: string, optionId: string, currentVoteId?: string | null) => {
@@ -62,7 +70,7 @@ export default function Polls() {
     setVotingPollId(pollId);
     try {
       await API.polls.vote(pollId, optionId);
-      addNotification({ title: 'Vote enregistré', message: 'Merci pour votre participation.', type: 'success' });
+      addNotification({ title: 'Vote enregistré', message: 'Merci de votre participation.', type: 'success' });
       await fetchPolls(false);
     } catch (error) {
       addNotification({ title: 'Erreur', message: "Action refusée.", type: 'alert' });
@@ -102,45 +110,46 @@ export default function Polls() {
     });
   }, [user, polls, searchTerm, statusFilter, isAdmin]);
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-primary-500" /></div>;
+  if (loading) return <div className="flex justify-center py-24"><Loader2 className="animate-spin text-brand" size={48} /></div>;
 
   return (
     <div className="max-w-7xl mx-auto space-y-12 pb-32 animate-fade-in px-4">
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 border-b border-gray-100 dark:border-gray-800 pb-12">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 border-b border-slate-100 dark:border-slate-800 pb-12">
         <div className="flex items-center gap-6">
-           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary-500 text-white rounded-[2rem] flex items-center justify-center shadow-premium"><BarChart3 size={36} /></div>
-           <h2 className="text-3xl sm:text-5xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter">Consultations</h2>
+           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-brand text-white rounded-[2rem] flex items-center justify-center shadow-premium"><BarChart3 size={36} /></div>
+           <h2 className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">Consultations</h2>
         </div>
         {canPost && (
-          <button onClick={() => setIsModalOpen(true)} className="bg-gray-900 dark:bg-black text-white px-10 py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-premium italic flex items-center gap-2 hover:scale-105 transition-all">
-            <Plus size={20} /> Créer un Sondage
+          <button onClick={() => setIsModalOpen(true)} className="bg-slate-900 dark:bg-slate-800 text-white px-10 py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-premium italic flex items-center gap-2 hover:scale-105 transition-all">
+            <Plus size={20} /> Nouveau Scrutin
           </button>
         )}
       </div>
 
-      <div className="grid gap-12">
+      <div className="grid gap-10">
         {displayedPolls.map((poll) => {
           const canManage = isAdmin || (user?.id === poll.user_id);
           
           return (
-            <div key={poll.id} className="bg-white dark:bg-gray-900 rounded-[4rem] p-10 shadow-soft border-2 border-transparent hover:border-primary-100 transition-all flex flex-col relative group">
+            <div key={poll.id} className="bg-white dark:bg-slate-900 rounded-[4rem] p-10 shadow-soft border-2 border-transparent hover:border-brand-100 transition-all flex flex-col relative group">
                <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-6">
                   <div className="space-y-3">
-                    <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${poll.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'}`}>
+                    <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${poll.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
                       {poll.isActive ? 'Scrutin Ouvert' : 'Scrutin Clos'}
                     </span>
-                    <h3 className="text-3xl font-black italic text-gray-900 dark:text-white uppercase tracking-tighter leading-tight">{poll.question}</h3>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{poll.className} • {poll.totalVotes} votes exprimés</p>
+                    <h3 className="text-3xl font-black italic text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">{poll.question}</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{poll.className} • {poll.totalVotes} participations</p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => handleShare(poll)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm" title="Partager"><Share2 size={20}/></button>
-                    <button onClick={() => handleCopy(poll)} className="p-4 bg-gray-50 text-gray-500 rounded-2xl hover:bg-gray-900 hover:text-white transition-all shadow-sm" title="Copier"><Copy size={20}/></button>
+                    <button onClick={() => handleShareWhatsApp(poll)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm active:scale-90" title="WhatsApp"><MessageCircle size={20}/></button>
+                    <button onClick={() => handleShareEmail(poll)} className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-500 hover:text-white transition-all shadow-sm active:scale-90" title="Email Classe"><Mail size={20}/></button>
+                    <button onClick={() => handleCopy(poll)} className="p-4 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-900 hover:text-white transition-all shadow-sm active:scale-90" title="Copier"><Copy size={20}/></button>
                     {canManage && (
                       <>
-                        <button onClick={() => handleToggleStatus(poll)} className="p-4 bg-gray-50 text-gray-400 hover:text-primary-500 rounded-2xl transition-all shadow-sm" title={poll.isActive ? "Clôturer" : "Ouvrir"}>
+                        <button onClick={() => handleToggleStatus(poll)} className="p-4 bg-slate-50 text-slate-400 hover:text-brand rounded-2xl transition-all shadow-sm active:scale-90" title={poll.isActive ? "Verrouiller" : "Déverrouiller"}>
                            {poll.isActive ? <Lock size={20}/> : <Unlock size={20}/>}
                         </button>
-                        <button onClick={() => handleDelete(poll.id)} className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm" title="Supprimer">
+                        <button onClick={() => handleDelete(poll.id)} className="p-4 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-sm active:scale-90" title="Supprimer">
                            <Trash2 size={20}/>
                         </button>
                       </>
@@ -153,13 +162,13 @@ export default function Polls() {
                     const isSelected = poll.userVoteOptionId === opt.id;
                     const percent = Math.round((opt.votes / (poll.totalVotes || 1)) * 100);
                     return (
-                      <button key={opt.id} disabled={!poll.isActive} onClick={() => handleVote(poll.id, opt.id, poll.userVoteOptionId)} className={`w-full p-6 rounded-2xl border-2 text-left flex justify-between items-center transition-all relative overflow-hidden group/opt ${isSelected ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-50 dark:bg-gray-800 border-transparent hover:border-primary-500'}`}>
+                      <button key={opt.id} disabled={!poll.isActive} onClick={() => handleVote(poll.id, opt.id, poll.userVoteOptionId)} className={`w-full p-6 rounded-2xl border-2 text-left flex justify-between items-center transition-all relative overflow-hidden group/opt ${isSelected ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 dark:bg-slate-800 border-transparent hover:border-brand-500'}`}>
                         {(!poll.isActive || poll.hasVoted) && (
-                          <div className="absolute top-0 left-0 h-full bg-primary-500/10 transition-all duration-1000" style={{ width: `${percent}%` }} />
+                          <div className="absolute top-0 left-0 h-full bg-brand-500/10 transition-all duration-1000" style={{ width: `${percent}%` }} />
                         )}
-                        <span className="font-bold relative z-10">{opt.label}</span>
+                        <span className="font-bold relative z-10 italic">{opt.label}</span>
                         <div className="flex items-center gap-4 relative z-10">
-                          {(isSelected || !poll.isActive || poll.hasVoted) && <span className="text-[10px] font-black uppercase">{percent}%</span>}
+                          {(isSelected || !poll.isActive || poll.hasVoted) && <span className="text-[10px] font-black uppercase italic">{percent}%</span>}
                           {isSelected && <CheckCircle2 size={20} className="text-emerald-400" />}
                         </div>
                       </button>
@@ -184,29 +193,29 @@ export default function Polls() {
           } catch (e) { addNotification({ title: 'Erreur', message: 'Création impossible.', type: 'alert' }); }
           finally { setSubmitting(false); }
         }} className="space-y-6">
-          <textarea required placeholder="Quelle est votre question ?" value={newPoll.question} onChange={e => setNewPoll({...newPoll, question: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic border-none focus:ring-4 focus:ring-primary-50" rows={3} />
+          <textarea required placeholder="Votre question institutionnelle..." value={newPoll.question} onChange={e => setNewPoll({...newPoll, question: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic border-none focus:ring-4 focus:ring-brand-50" rows={3} />
           <div className="space-y-3">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Options de vote</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Réponses possibles</label>
             {newPoll.options.map((opt, i) => (
               <div key={i} className="flex gap-2">
-                <input required placeholder={`Choix ${i+1}`} value={opt} onChange={e => {
+                <input required placeholder={`Option ${i+1}`} value={opt} onChange={e => {
                   const n = [...newPoll.options];
                   n[i] = e.target.value;
                   setNewPoll({...newPoll, options: n});
-                }} className="flex-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl font-bold italic text-sm" />
+                }} className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl font-bold italic text-sm border-none" />
                 {newPoll.options.length > 2 && (
-                  <button type="button" onClick={() => setNewPoll({...newPoll, options: newPoll.options.filter((_, idx) => idx !== i)})} className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-all"><X size={18}/></button>
+                  <button type="button" onClick={() => setNewPoll({...newPoll, options: newPoll.options.filter((_, idx) => idx !== i)})} className="p-3 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"><X size={18}/></button>
                 )}
               </div>
             ))}
-            <button type="button" onClick={() => setNewPoll({...newPoll, options: [...newPoll.options, '']})} className="text-[10px] font-black text-primary-500 uppercase tracking-widest p-2 hover:bg-primary-50 rounded-lg transition-all">+ Ajouter une option</button>
+            <button type="button" onClick={() => setNewPoll({...newPoll, options: [...newPoll.options, '']})} className="text-[10px] font-black text-brand uppercase tracking-widest p-2 hover:bg-brand-50 rounded-lg transition-all">+ Ajouter une option</button>
           </div>
-          <select disabled={!isAdmin} value={newPoll.className} onChange={e => setNewPoll({...newPoll, className: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase">
-            <option value="Général">Toute l'institution</option>
+          <select disabled={!isAdmin} value={newPoll.className} onChange={e => setNewPoll({...newPoll, className: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-black text-[10px] uppercase border-none outline-none">
+            <option value="Général">Tout le campus</option>
             {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
           </select>
-          <button type="submit" disabled={submitting} className="w-full py-5 bg-primary-500 text-white rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-xl active:scale-95 transition-all">
-            {submitting ? <Loader2 className="animate-spin mx-auto"/> : "Ouvrir les urnes"}
+          <button type="submit" disabled={submitting} className="w-full py-5 bg-slate-900 dark:bg-slate-800 text-white rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-xl active:scale-95 transition-all">
+            {submitting ? <Loader2 className="animate-spin mx-auto"/> : "Valider le Scrutin"}
           </button>
         </form>
       </Modal>

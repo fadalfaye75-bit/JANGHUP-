@@ -1,52 +1,38 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
-  Loader2, Trash2, Save, FileSpreadsheet, MapPin, User as UserIcon, Clock, Calendar as CalendarIcon, Plus, X
+  Loader2, Trash2, Save, FileSpreadsheet, MapPin, User as UserIcon, Clock, Calendar as CalendarIcon, 
+  Plus, X, ChevronRight, AlertCircle, UploadCloud, FileText, Download, Eye, ExternalLink, MessageCircle, Mail
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, ScheduleSlot } from '../types';
 import { useNotification } from '../context/NotificationContext';
 import { API } from '../services/api';
 import Modal from '../components/Modal';
-import * as XLSX from 'xlsx';
 
 const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const TIME_SLOTS = [
-  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00",
-  "12:30", "13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30", "18:00", "18:30"
+  "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"
 ];
 
 const CATEGORY_COLORS = [
-  { name: 'Bleu', color: '#0ea5e9', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
+  { name: 'Bleu Ciel', color: '#87CEEB', bg: 'bg-brand-50', border: 'border-brand-200', text: 'text-brand-700' },
   { name: 'Émeraude', color: '#10b981', bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' },
-  { name: 'Violet', color: '#8b5cf6', bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700' },
   { name: 'Ambre', color: '#f59e0b', bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
+  { name: 'Indigo', color: '#6366f1', bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700' },
   { name: 'Rose', color: '#f43f5e', bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700' },
 ];
-
-const normalizeTime = (raw: any): string => {
-  if (!raw) return "";
-  let time = raw.toString().toLowerCase().trim().replace(/[hH]/g, ':');
-  if (time.includes(':')) {
-    let [h, m] = time.split(':');
-    let hour = parseInt(h, 10);
-    let min = parseInt(m, 10) || 0;
-    if (min > 0 && min < 45) min = 30;
-    else if (min >= 45) { hour += 1; min = 0; }
-    return `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
-  }
-  const val = parseInt(time, 10);
-  if (!isNaN(val)) return `${val.toString().padStart(2, '0')}:00`;
-  return "";
-};
 
 export default function Schedule() {
   const { user } = useAuth();
   const { addNotification } = useNotification();
-  const themeColor = user?.themeColor || '#0ea5e9';
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -54,12 +40,19 @@ export default function Schedule() {
   
   const canEdit = user?.role === UserRole.ADMIN || user?.role === UserRole.DELEGATE;
   const currentClassName = user?.className || 'Général';
+  const themeColor = user?.themeColor || '#87CEEB';
 
-  const fetchAllData = useCallback(async (quiet = false) => {
+  const fetchData = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     try {
-      const gridSlots = await API.schedules.getSlots(currentClassName);
-      setSlots(gridSlots);
+      const [gridSlots, files, classList] = await Promise.all([
+        API.schedules.getSlots(currentClassName),
+        API.schedules.list(currentClassName),
+        API.classes.list()
+      ]);
+      setSlots(gridSlots || []);
+      setDocuments(files || []);
+      setClasses(classList || []);
       setHasUnsavedChanges(false);
     } catch (error) {
       console.error(error);
@@ -69,109 +62,66 @@ export default function Schedule() {
   }, [currentClassName]);
 
   useEffect(() => {
-    fetchAllData();
-  }, [fetchAllData]);
+    fetchData();
+  }, [fetchData]);
 
-  const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-
-        let headerRowIdx = -1;
-        for (let i = 0; i < Math.min(data.length, 20); i++) {
-          if (data[i].some(c => String(c).toLowerCase().includes('lundi'))) {
-            headerRowIdx = i;
-            break;
-          }
-        }
-        if (headerRowIdx === -1) throw new Error("Fichier non reconnu (en-tête Lundi introuvable).");
-
-        const dayCols: { [key: number]: number } = {};
-        data[headerRowIdx].forEach((cell, colIdx) => {
-          if (!cell) return;
-          const dayIdx = DAYS.findIndex(d => String(cell).toLowerCase().includes(d.toLowerCase()));
-          if (dayIdx !== -1) dayCols[dayIdx] = colIdx;
-        });
-
-        const rowToTime: { [key: number]: string } = {};
-        for (let i = headerRowIdx + 1; i < data.length; i++) {
-          const timeVal = data[i][0] || data[i][1];
-          const norm = normalizeTime(timeVal);
-          if (norm) rowToTime[i] = norm;
-        }
-
-        const parsedSlots: ScheduleSlot[] = [];
-        Object.entries(dayCols).forEach(([dayIdxStr, colIdx]) => {
-          const dayIdx = parseInt(dayIdxStr);
-          for (let i = headerRowIdx + 1; i < data.length; i++) {
-            const cellValue = data[i][colIdx];
-            if (cellValue && String(cellValue).trim().length > 3) {
-              const content = String(cellValue).trim();
-              let startTime = rowToTime[i];
-              
-              if (!startTime) {
-                for (let k = i - 1; k > headerRowIdx; k--) { if (rowToTime[k]) { startTime = rowToTime[k]; break; } }
-              }
-              if (!startTime) startTime = "08:00";
-
-              // BLOQUAGE PAUSE DÉJEUNER DANS L'IMPORT
-              if (startTime >= "12:00" && startTime < "14:30") continue;
-
-              let lastRowOfBlock = i;
-              for (let j = i + 1; j < data.length; j++) {
-                const nextCell = data[j][colIdx];
-                if (nextCell !== undefined && nextCell !== null && String(nextCell).trim().length > 3 && String(nextCell).trim() !== content) break;
-                if (rowToTime[j] && nextCell !== undefined && String(nextCell).trim().length > 3) break;
-                lastRowOfBlock = j;
-              }
-
-              let endTime = rowToTime[lastRowOfBlock + 1] || "18:30";
-              if (endTime > "12:00" && endTime <= "14:30") endTime = "12:00";
-
-              const lines = content.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
-              
-              parsedSlots.push({
-                id: `temp-${Date.now()}-${parsedSlots.length}`,
-                day: dayIdx,
-                startTime,
-                endTime,
-                subject: lines[0] || "Cours",
-                teacher: lines.find(l => /pr|dr|m\.|mme/i.test(l)) || "À définir",
-                room: lines.find(l => /salle|amphi/i.test(l)) || "À définir",
-                color: CATEGORY_COLORS[parsedSlots.length % CATEGORY_COLORS.length].color,
-                classname: currentClassName
-              });
-              i = lastRowOfBlock;
-            }
-          }
-        });
-
-        setSlots(parsedSlots);
-        setHasUnsavedChanges(true);
-        addNotification({ title: 'Importation réussie', message: `${parsedSlots.length} cours détectés.`, type: 'success' });
-      } catch (err: any) {
-        addNotification({ title: 'Erreur', message: err.message, type: 'alert' });
-      }
-    };
-    reader.readAsBinaryString(file);
-    e.target.value = '';
+    setUploading(true);
+    try {
+      await API.schedules.uploadFile(file, currentClassName);
+      addNotification({ title: 'Succès', message: 'Document téléversé avec succès.', type: 'success' });
+      fetchData(true);
+    } catch (error: any) {
+      addNotification({ title: 'Erreur', message: "Échec du téléversement. Vérifiez les permissions du Storage Supabase.", type: 'alert' });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
-  const handleSave = async () => {
+  const handleShareWhatsApp = () => {
+    const text = `📅 *EMPLOI DU TEMPS JANGHUP*\n\nClasse : *${currentClassName}*\nL'emploi du temps a été mis à jour. Connectez-vous pour le consulter !`;
+    API.sharing.whatsapp(text);
+  };
+
+  const handleShareEmail = () => {
+    // Correction de la recherche : normalisation du nom de la classe
+    const classObj = classes.find(c => c.name.trim().toLowerCase() === currentClassName.trim().toLowerCase());
+    const to = classObj?.email || '';
+    
+    if (!to) {
+       addNotification({ title: 'Email manquant', message: "Aucun email configuré pour cette classe. Envoi à l'administration.", type: 'warning' });
+    }
+
+    const subject = `📅 MISE À JOUR EMPLOI DU TEMPS: ${currentClassName}`;
+    const body = `Bonjour,\n\nL'emploi du temps de la classe ${currentClassName} a été actualisé sur le portail JangHup ESP.\n\nLien d'accès: ${window.location.origin}\n\n🎓 Cordialement,\nLe portail JangHup`;
+    
+    API.sharing.email(to, subject, body);
+  };
+
+  const handleSaveSlots = async () => {
     setSaving(true);
     try {
-      await API.schedules.saveSlots(currentClassName, slots);
-      addNotification({ title: 'Publié', message: 'Planning mis à jour.', type: 'success' });
+      const payload = slots.map(s => ({
+        day: s.day,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        subject: s.subject,
+        teacher: s.teacher || 'À définir',
+        room: s.room || 'À définir',
+        color: s.color,
+        classname: currentClassName
+      }));
+      
+      await API.schedules.saveSlots(currentClassName, payload as any);
+      addNotification({ title: 'Publié', message: 'Emploi du temps mis à jour.', type: 'success' });
       setHasUnsavedChanges(false);
+      fetchData(true);
     } catch (e) {
-      addNotification({ title: 'Erreur', message: 'Sauvegarde impossible.', type: 'alert' });
+      addNotification({ title: 'Erreur', message: 'Échec de la sauvegarde.', type: 'alert' });
     } finally {
       setSaving(false);
     }
@@ -179,17 +129,12 @@ export default function Schedule() {
 
   const openNewSlotModal = (dayIdx: number, timeStr: string) => {
     if (!canEdit) return;
-    const isPause = timeStr >= "12:00" && timeStr < "14:30";
-    if (isPause) {
-      addNotification({ title: 'Pause Déjeuner', message: 'Aucun cours ne peut être placé entre 12h et 14h30.', type: 'info' });
-      return;
-    }
+    const isPause = timeStr >= "12:00" && timeStr < "14:00";
+    if (isPause) return;
 
-    // Calculer endTime par défaut (1h après ou jusqu'à la pause)
-    let [h, m] = timeStr.split(':').map(Number);
-    let endH = h + 1;
-    let endTimeStr = `${endH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-    if (endTimeStr > "12:00" && endTimeStr < "14:30") endTimeStr = "12:00";
+    const startH = parseInt(timeStr.split(':')[0]);
+    const endH = startH + 1; 
+    const endTimeStr = `${endH.toString().padStart(2, '0')}:00`;
 
     setSelectedSlot({
       id: `new-${Date.now()}`,
@@ -206,28 +151,26 @@ export default function Schedule() {
   };
 
   const renderCell = (dayIdx: number, timeStr: string) => {
-    const isPause = timeStr >= "12:00" && timeStr < "14:30";
+    const isPause = timeStr === "12:00" || timeStr === "13:00";
     const slot = slots.find(s => s.day === dayIdx && s.startTime === timeStr);
     
     if (slot) {
-      const units = (() => {
-        const [h1, m1] = slot.startTime.split(':').map(Number);
-        const [h2, m2] = slot.endTime.split(':').map(Number);
-        return ((h2 * 60 + m2) - (h1 * 60 + m1)) / 30;
-      })();
-      const style = CATEGORY_COLORS.find(c => c.color === slot.color) || CATEGORY_COLORS[0];
+      const startH = parseInt(slot.startTime.split(':')[0]);
+      const endH = parseInt(slot.endTime.split(':')[0]);
+      const duration = endH - startH;
+      const colorSet = CATEGORY_COLORS.find(c => c.color === slot.color) || CATEGORY_COLORS[0];
 
       return (
         <div 
           key={slot.id}
           onClick={(e) => { e.stopPropagation(); if(canEdit) { setSelectedSlot(slot); setShowEditModal(true); } }}
-          className={`absolute inset-x-1 top-1 p-3 rounded-2xl border-l-4 shadow-sm z-20 ${style.bg} ${style.border} ${style.text} ${canEdit ? 'cursor-pointer hover:scale-[1.02] transition-transform' : ''}`}
-          style={{ height: `calc(${units} * 100% - 8px)` }}
+          className={`absolute inset-x-1 top-1 p-3 rounded-2xl border-l-4 shadow-sm z-20 ${colorSet.bg} ${colorSet.border} ${colorSet.text} ${canEdit ? 'cursor-pointer hover:scale-[1.02] transition-transform' : ''} overflow-hidden`}
+          style={{ height: `calc(${duration} * 100% - 8px)` }}
         >
-          <p className="text-[10px] font-black uppercase tracking-tight line-clamp-2 leading-tight mb-1">{slot.subject}</p>
-          <div className="flex flex-col gap-0.5 opacity-70">
-            <div className="flex items-center gap-1 text-[9px] font-bold truncate"><MapPin size={10} /> {slot.room}</div>
-            {units > 2 && <div className="flex items-center gap-1 text-[9px] font-bold truncate"><UserIcon size={10} /> {slot.teacher}</div>}
+          <p className="text-[10px] font-black uppercase tracking-tight line-clamp-1 leading-none mb-1 italic">{slot.subject}</p>
+          <div className="flex flex-col gap-0.5 opacity-80">
+            <div className="flex items-center gap-1 text-[8px] font-bold truncate"><MapPin size={10} /> {slot.room}</div>
+            {duration >= 1.5 && <div className="flex items-center gap-1 text-[8px] font-bold truncate"><UserIcon size={10} /> {slot.teacher}</div>}
           </div>
         </div>
       );
@@ -236,144 +179,206 @@ export default function Schedule() {
     return (
       <div 
         onClick={() => openNewSlotModal(dayIdx, timeStr)}
-        className={`w-full h-full ${isPause ? 'bg-gray-100/50 cursor-not-allowed' : 'hover:bg-gray-50/50 cursor-cell'} transition-colors`}
+        className={`w-full h-full ${isPause ? 'bg-slate-50/50 dark:bg-slate-800/20 cursor-not-allowed' : 'hover:bg-slate-50/50 cursor-crosshair'} transition-colors relative`}
       >
-        {isPause && dayIdx === 2 && timeStr === "12:30" && (
-           <div className="absolute inset-0 flex items-center justify-center text-gray-400 font-black text-[9px] uppercase tracking-widest whitespace-nowrap">Pause Déjeuner (12h-14h30)</div>
+        {isPause && dayIdx === 2 && timeStr === "12:00" && (
+           <div className="absolute inset-0 flex items-center justify-center text-slate-300 dark:text-slate-700 font-black text-[9px] uppercase tracking-widest pointer-events-none">Pause</div>
         )}
       </div>
     );
   };
 
   if (loading) return (
-    <div className="flex flex-col justify-center items-center py-32 gap-6">
-      <Loader2 className="animate-spin text-primary-500" size={48} />
-      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest animate-pulse">Chargement...</p>
+    <div className="flex flex-col justify-center items-center py-24 gap-4">
+      <Loader2 className="animate-spin text-brand" size={48} />
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic animate-pulse">Initialisation de la grille...</p>
     </div>
   );
 
   return (
-    <div className="max-w-7xl mx-auto space-y-10 pb-32 animate-fade-in">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 border-b border-gray-100 dark:border-gray-800 pb-10">
+    <div className="space-y-12 animate-fade-in pb-32">
+      {/* Header Panel */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 border-b border-slate-100 dark:border-slate-800 pb-12">
         <div className="flex items-center gap-6">
-           <div className="w-16 h-16 bg-primary-500 text-white rounded-[1.8rem] flex items-center justify-center shadow-lg"><CalendarIcon size={32} /></div>
+           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-brand text-white rounded-[2.5rem] flex items-center justify-center shadow-premium"><CalendarIcon size={36} /></div>
            <div>
-              <h2 className="text-4xl font-black text-gray-900 dark:text-white italic uppercase tracking-tighter">Emploi du Temps</h2>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">{currentClassName} • ESP Dakar</p>
+              <h2 className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white italic uppercase tracking-tighter leading-none">Emploi du Temps</h2>
+              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mt-3">{currentClassName}</p>
            </div>
         </div>
 
-        {canEdit && (
-          <div className="flex flex-wrap gap-4">
-            <label className="flex items-center gap-3 bg-emerald-50 text-emerald-600 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-pointer hover:bg-emerald-100 transition-all shadow-md">
-              <FileSpreadsheet size={18} /> Importer Excel
-              <input type="file" hidden accept=".xlsx, .xls" onChange={handleExcelUpload} />
-            </label>
-            <button onClick={() => openNewSlotModal(0, "08:00")} className="flex items-center gap-3 bg-gray-900 text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-md">
-              <Plus size={18} /> Ajouter Manuel
-            </button>
-            {hasUnsavedChanges && (
-              <button onClick={handleSave} disabled={saving} className="bg-primary-500 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-xl animate-bounce-subtle">
-                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16}/>} Publier
+        <div className="flex flex-wrap gap-3 items-center">
+          <button 
+            onClick={handleShareWhatsApp} 
+            className="flex items-center gap-2 p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm active:scale-95 group"
+            title="Partager WhatsApp"
+          >
+            <MessageCircle size={24} />
+            <span className="hidden lg:inline text-[9px] font-black uppercase">WhatsApp</span>
+          </button>
+          
+          <button 
+            onClick={handleShareEmail} 
+            className="flex items-center gap-2 p-4 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-500 hover:text-white transition-all shadow-sm active:scale-95 group"
+            title="Diffuser par Email"
+          >
+            <Mail size={24} />
+            <span className="hidden lg:inline text-[9px] font-black uppercase">Mail Classe</span>
+          </button>
+          
+          {canEdit && (
+            <>
+              <div className="h-10 w-[1px] bg-slate-100 dark:bg-slate-800 mx-2 hidden sm:block" />
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,image/*" />
+              <button 
+                onClick={() => fileInputRef.current?.click()} 
+                disabled={uploading} 
+                className="bg-slate-900 dark:bg-slate-800 text-white px-8 py-5 rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center gap-3 active:scale-95 transition-all italic hover:bg-black"
+              >
+                {uploading ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />} Téléverser PDF/IMG
               </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="bg-white dark:bg-gray-900 rounded-[3.5rem] shadow-premium border border-gray-50 dark:border-gray-800 overflow-hidden relative">
-        <div className="overflow-x-auto custom-scrollbar">
-          <div className="min-w-[1000px]">
-            <div className="grid grid-cols-[100px_repeat(6,1fr)] bg-gray-50/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-700">
-              <div className="h-16 flex items-center justify-center border-r border-gray-100 dark:border-gray-700"><Clock size={20} className="text-gray-400" /></div>
-              {DAYS.map((day) => (
-                <div key={day} className="h-16 flex items-center justify-center font-black italic uppercase text-[11px] tracking-[0.2em] text-gray-900 dark:text-white border-r border-gray-100 dark:border-gray-700 last:border-0">{day}</div>
-              ))}
-            </div>
-
-            {TIME_SLOTS.map((timeStr) => {
-              return (
-                <div key={timeStr} className="grid grid-cols-[100px_repeat(6,1fr)] border-b border-gray-100 dark:border-gray-800 last:border-0">
-                  <div className="h-14 flex items-center justify-center border-r border-gray-100 dark:border-gray-700">
-                    <span className="text-[11px] font-black text-gray-400 italic">{timeStr}</span>
-                  </div>
-                  {DAYS.map((_, dayIdx) => (
-                    <div key={dayIdx} className="h-14 relative border-r border-gray-100 dark:border-gray-700 last:border-0">
-                      {renderCell(dayIdx, timeStr)}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
+              {hasUnsavedChanges && (
+                <button onClick={handleSaveSlots} disabled={saving} className="bg-emerald-500 text-white px-10 py-5 rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-premium flex items-center gap-3 animate-pulse">
+                  {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Publier Grille
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
-      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title={selectedSlot?.id?.startsWith('new') ? "Ajouter un cours" : "Modifier le créneau"}>
+      <div className="grid lg:grid-cols-4 gap-10">
+        <div className="lg:col-span-3 space-y-8">
+          <div className="bg-white dark:bg-slate-900 rounded-[3.5rem] shadow-premium border border-slate-50 dark:border-slate-800 overflow-hidden">
+            <div className="overflow-x-auto custom-scrollbar">
+              <div className="min-w-[800px]">
+                <div className="grid grid-cols-[80px_repeat(6,1fr)] bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800">
+                  <div className="h-16 flex items-center justify-center border-r border-slate-100 dark:border-slate-800"><Clock size={16} className="text-slate-300" /></div>
+                  {DAYS.map((day) => (
+                    <div key={day} className="h-16 flex items-center justify-center font-black italic uppercase text-[10px] tracking-widest text-slate-900 dark:text-white border-r border-slate-100 dark:border-slate-800 last:border-0">{day}</div>
+                  ))}
+                </div>
+
+                {TIME_SLOTS.map((timeStr) => {
+                  return (
+                    <div key={timeStr} className="grid grid-cols-[80px_repeat(6,1fr)] border-b border-slate-100 dark:border-slate-800 last:border-0">
+                      <div className="h-20 flex items-center justify-center border-r border-slate-100 dark:border-slate-800">
+                        <span className="text-[10px] font-black text-slate-400 italic">{timeStr}</span>
+                      </div>
+                      {DAYS.map((_, dayIdx) => (
+                        <div key={dayIdx} className="h-20 relative border-r border-slate-100 dark:border-slate-800 last:border-0">
+                          {renderCell(dayIdx, timeStr)}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+           <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-[0.3em] italic px-2">Documents (PDF/Images)</h3>
+           <div className="space-y-4">
+              {documents.length > 0 ? documents.map(doc => (
+                <div key={doc.id} className="bg-white dark:bg-slate-900 p-6 rounded-4xl shadow-soft border border-slate-50 dark:border-slate-800 group transition-all hover:shadow-premium">
+                   <div className="flex items-center gap-4 mb-6">
+                      <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors"><FileText size={24}/></div>
+                      <div className="min-w-0 flex-1">
+                         <p className="text-sm font-black italic text-slate-900 dark:text-white truncate uppercase">{doc.name}</p>
+                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{new Date(doc.created_at).toLocaleDateString()}</p>
+                      </div>
+                   </div>
+                   <div className="flex gap-2">
+                      <a href={doc.url} target="_blank" rel="noreferrer" className="flex-1 py-3 bg-slate-50 dark:bg-slate-800 hover:bg-brand hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest text-center transition-all shadow-sm">
+                        Ouvrir
+                      </a>
+                      {canEdit && (
+                        <button onClick={() => { if(confirm('Supprimer ce fichier ?')) API.schedules.deleteFile(doc.id).then(() => fetchData(true)); }} className="p-3 bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all shadow-sm">
+                          <Trash2 size={16}/>
+                        </button>
+                      )}
+                   </div>
+                </div>
+              )) : (
+                <div className="p-10 bg-slate-50 dark:bg-slate-800/20 rounded-[3rem] text-center border-2 border-dashed border-slate-100 dark:border-slate-700">
+                   <FileText size={32} className="mx-auto mb-4 text-slate-200" />
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic leading-tight">Aucun document téléversé</p>
+                </div>
+              )}
+           </div>
+        </div>
+      </div>
+
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title={selectedSlot?.id?.startsWith('new') ? "Ajouter une Séance" : "Modifier le Créneau"}>
         {selectedSlot && (
           <form onSubmit={(e) => {
             e.preventDefault();
             const slot = selectedSlot as ScheduleSlot;
-            if (slot.startTime >= slot.endTime) {
-              alert("L'heure de fin doit être après l'heure de début.");
+            const startH = parseInt(slot.startTime.split(':')[0]);
+            const endH = parseInt(slot.endTime.split(':')[0]);
+            
+            if (startH >= endH) {
+              addNotification({ title: 'Erreur', message: "Horaire incohérent.", type: 'alert' });
               return;
             }
-            if (selectedSlot.id?.startsWith('new')) {
-              setSlots(prev => [...prev, slot]);
-            } else {
-              setSlots(prev => prev.map(s => s.id === slot.id ? slot : s));
-            }
+
+            if (selectedSlot.id?.startsWith('new')) setSlots(prev => [...prev, slot]);
+            else setSlots(prev => prev.map(s => s.id === slot.id ? slot : s));
+            
             setHasUnsavedChanges(true);
             setShowEditModal(false);
           }} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-gray-400">Matière / Module</label>
-              <input required value={selectedSlot.subject} onChange={e => setSelectedSlot({...selectedSlot, subject: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic outline-none border-none focus:ring-4 focus:ring-primary-50" placeholder="ex: Analyse Mathématique" />
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Module / Matière</label>
+              <input required value={selectedSlot.subject} onChange={e => setSelectedSlot({...selectedSlot, subject: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-none focus:ring-4 focus:ring-brand-50" placeholder="Analyse Mathématique..." />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400">Salle</label>
-                <input required value={selectedSlot.room} onChange={e => setSelectedSlot({...selectedSlot, room: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic border-none" placeholder="Salle 101" />
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Salle</label>
+                <input required value={selectedSlot.room} onChange={e => setSelectedSlot({...selectedSlot, room: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic border-none focus:ring-4 focus:ring-brand-50" placeholder="Salle 105" />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400">Professeur</label>
-                <input required value={selectedSlot.teacher} onChange={e => setSelectedSlot({...selectedSlot, teacher: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic border-none" placeholder="Dr. Sy" />
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Professeur</label>
+                <input required value={selectedSlot.teacher} onChange={e => setSelectedSlot({...selectedSlot, teacher: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic border-none focus:ring-4 focus:ring-brand-50" placeholder="M. Ndiaye" />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400">Heure de début</label>
-                <select value={selectedSlot.startTime} onChange={e => setSelectedSlot({...selectedSlot, startTime: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase outline-none border-none">
-                  {TIME_SLOTS.map(t => <option key={t} value={t} disabled={t >= "12:00" && t < "14:30"}>{t}</option>)}
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Début</label>
+                <select value={selectedSlot.startTime} onChange={e => setSelectedSlot({...selectedSlot, startTime: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-black text-[10px] uppercase outline-none border-none">
+                  {TIME_SLOTS.map(t => <option key={t} value={t} disabled={t >= "12:00" && t < "14:00"}>{t}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-gray-400">Heure de fin</label>
-                <select value={selectedSlot.endTime} onChange={e => setSelectedSlot({...selectedSlot, endTime: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase outline-none border-none">
-                  {TIME_SLOTS.map(t => <option key={t} value={t} disabled={t > "12:00" && t < "14:30"}>{t}</option>)}
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Fin</label>
+                <select value={selectedSlot.endTime} onChange={e => setSelectedSlot({...selectedSlot, endTime: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-black text-[10px] uppercase outline-none border-none">
+                  {TIME_SLOTS.map(t => <option key={t} value={t}>{t}</option>)}
                   <option value="19:00">19:00</option>
+                  <option value="20:00">20:00</option>
                 </select>
               </div>
             </div>
 
             <div className="space-y-4">
-              <label className="text-[10px] font-black uppercase text-gray-400">Couleur de catégorie</label>
-              <div className="flex gap-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Code Couleur</label>
+              <div className="flex gap-3">
                 {CATEGORY_COLORS.map(c => (
-                  <button key={c.color} type="button" onClick={() => setSelectedSlot({...selectedSlot, color: c.color})} className={`w-8 h-8 rounded-full transition-all ${selectedSlot.color === c.color ? 'ring-4 ring-offset-4 ring-gray-200 scale-110' : 'opacity-60 hover:opacity-100'}`} style={{ backgroundColor: c.color }} />
+                  <button key={c.color} type="button" onClick={() => setSelectedSlot({...selectedSlot, color: c.color})} className={`w-8 h-8 rounded-full transition-all ${selectedSlot.color === c.color ? 'ring-4 ring-offset-4 ring-brand scale-110 shadow-lg' : 'opacity-40 hover:opacity-100 shadow-sm'}`} style={{ backgroundColor: c.color }} />
                 ))}
               </div>
             </div>
 
-            <div className="flex gap-4 pt-4">
-               <button type="submit" className="flex-1 bg-primary-500 text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl">
-                 {selectedSlot.id?.startsWith('new') ? "Ajouter au planning" : "Enregistrer"}
+            <div className="flex gap-3 pt-6">
+               <button type="submit" className="flex-1 bg-brand text-white py-5 rounded-3xl font-black uppercase text-[11px] tracking-widest shadow-premium italic active:scale-95 transition-all">
+                 {selectedSlot.id?.startsWith('new') ? "Ajouter" : "Appliquer"}
                </button>
                {!selectedSlot.id?.startsWith('new') && (
-                 <button type="button" onClick={() => { if(window.confirm('Supprimer ce cours ?')) { setSlots(prev => prev.filter(s => s.id !== selectedSlot.id)); setHasUnsavedChanges(true); setShowEditModal(false); } }} className="p-4 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-md">
-                   <Trash2 size={20}/>
+                 <button type="button" onClick={() => { if(confirm('Retirer ce créneau ?')) { setSlots(prev => prev.filter(s => s.id !== selectedSlot.id)); setHasUnsavedChanges(true); setShowEditModal(false); } }} className="p-4 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-sm">
+                   <Trash2 size={24}/>
                  </button>
                )}
             </div>
