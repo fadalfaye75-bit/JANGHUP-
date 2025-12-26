@@ -20,7 +20,11 @@ export const API = {
       return profile;
     },
 
-    logout: async () => supabase.auth.signOut(),
+    logout: async () => {
+      // Déconnexion complète côté Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    },
 
     updateProfile: async (id: string, updates: Partial<User>) => {
       const { data, error } = await supabase.from('profiles').update(updates).eq('id', id).select().single();
@@ -189,11 +193,9 @@ export const API = {
       return data || [];
     },
     saveSlots: async (className: string, slots: ScheduleSlot[]) => {
-      // 1. Supprimer les anciens créneaux pour cette classe
       const { error: delError } = await supabase.from('schedule_slots').delete().eq('className', className);
       if (delError) throw delError;
       
-      // 2. Insérer les nouveaux si la liste n'est pas vide
       if (slots.length > 0) {
         const { error: insError } = await supabase.from('schedule_slots').insert(
           slots.map(s => ({
@@ -262,14 +264,18 @@ export const API = {
     markRead: async (id: string) => supabase.from('notifications').update({ is_read: true }).eq('id', id),
     markAllAsRead: async () => {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
       return supabase.from('notifications').update({ is_read: true }).eq('target_user_id', user?.id);
     },
     clear: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      return supabase.from('notifications').delete().eq('target_user_id', user?.id);
+      if (!user) return;
+      // Nettoyage physique en base de données pour l'utilisateur courant
+      const { error } = await supabase.from('notifications').delete().eq('target_user_id', user.id);
+      if (error) throw error;
     },
     subscribe: (callback: () => void) => {
-      const sub = supabase.channel('notif_prod').on('postgres_changes', { event: 'INSERT', table: 'notifications' }, callback).subscribe();
+      const sub = supabase.channel('notif_prod').on('postgres_changes', { event: '*', table: 'notifications' }, callback).subscribe();
       return { unsubscribe: () => supabase.removeChannel(sub) };
     }
   },
@@ -317,7 +323,7 @@ export const API = {
     },
     send: async (receiverId: string, content: string) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error = await supabase.from('direct_messages').insert([{
+      const { error } = await supabase.from('direct_messages').insert([{
         sender_id: user?.id,
         receiver_id: receiverId,
         content,

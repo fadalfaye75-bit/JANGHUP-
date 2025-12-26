@@ -12,7 +12,6 @@ interface NotificationContextType {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearNotifications: () => void;
-  // Added addNotification to NotificationContextType to allow components to trigger UI notifications
   addNotification: (payload: { title: string; message: string; type: 'info' | 'success' | 'warning' | 'alert' }) => void;
 }
 
@@ -29,7 +28,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     if (!user) return;
     try {
       const allNotifs = await API.notifications.list();
-      setNotifications(allNotifs);
+      setNotifications(allNotifs || []);
     } catch (e) {
       console.warn("[Notifications] Sync issue.");
     }
@@ -43,10 +42,8 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
 
     fetchNotifications();
 
-    // Abonnement temps réel : RLS garantit que l'utilisateur n'entend que ses propres notifications
     const subscription = API.notifications.subscribe(() => {
       fetchNotifications();
-      // On pourrait déclencher une notification sonore système ici si la permission est accordée
     });
 
     return () => {
@@ -79,16 +76,21 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   const clearNotifications = async () => {
-    if (!window.confirm("Voulez-vous supprimer tout votre historique d'alertes ?")) return;
+    if (!window.confirm("Voulez-vous supprimer définitivement votre historique d'alertes ?")) return;
+    
+    // Feedback immédiat sur l'UI
+    const backup = [...notifications];
+    setNotifications([]);
+    
     try {
       await API.notifications.clear();
-      setNotifications([]);
     } catch (e) {
-      console.error("Clear error");
+      console.error("Clear notifications error", e);
+      // Restauration en cas d'échec
+      setNotifications(backup);
     }
   };
 
-  // Implementation of addNotification to provide immediate UI feedback through local state
   const addNotification = useCallback((payload: { title: string; message: string; type: 'info' | 'success' | 'warning' | 'alert' }) => {
     const newNotif: AppNotification = {
       id: Math.random().toString(36).substring(2, 9),

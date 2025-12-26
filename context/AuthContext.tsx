@@ -106,9 +106,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
-    await API.auth.logout();
-    setUser(null);
-    setAdminViewClass(null);
+    try {
+      await API.auth.logout();
+    } catch (e) {
+      console.error("Logout error", e);
+    } finally {
+      // Nettoyage impératif de l'état local
+      setUser(null);
+      setAdminViewClass(null);
+      localStorage.removeItem('supabase.auth.token'); // Nettoyage manuel au cas où
+    }
   };
 
   const updateCurrentUser = async (updates: Partial<User>) => {
