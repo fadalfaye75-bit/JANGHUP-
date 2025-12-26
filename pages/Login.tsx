@@ -1,13 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, Loader2, AlertCircle, School, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, Loader2, AlertCircle, School, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +56,7 @@ export default function Login() {
             Portail JangHup
           </h1>
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-3 flex items-center justify-center gap-2">
-            <ShieldCheck size={12} className="text-primary-500" /> Accès Institutionnel ESP
+            <ShieldCheck size={12} className="text-primary-500" /> Accès Institutionnel
           </p>
         </div>
 
@@ -85,13 +87,20 @@ export default function Login() {
             <div className="relative group">
               <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={20} />
               <input 
-                type="password" 
+                type={showPassword ? "text" : "password"} 
                 value={password} 
                 onChange={(e) => setPassword(e.target.value)} 
                 placeholder="••••••••" 
-                className="w-full pl-16 pr-6 py-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border-none font-bold text-sm outline-none focus:ring-4 focus:ring-primary-50 transition-all shadow-inner-soft" 
+                className="w-full pl-16 pr-14 py-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border-none font-bold text-sm outline-none focus:ring-4 focus:ring-primary-50 transition-all shadow-inner-soft" 
                 required 
               />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary-500 transition-colors"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
           </div>
           
@@ -104,16 +113,9 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="mt-12 pt-8 border-t border-gray-50 dark:border-gray-800 text-center">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">
-            ESP Dakar • Direction des Systèmes d'Information
-          </p>
-          <p className="text-[9px] text-gray-300 mt-2">Accès restreint aux comptes authentifiés</p>
+        <div className="mt-12 pt-8 text-center border-t border-gray-50 dark:border-gray-800">
+          <p className="text-[10px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-[0.5em] italic">JangHup Production Cloud</p>
         </div>
-      </div>
-      
-      <div className="mt-10 text-center">
-        <p className="text-[10px] font-black text-gray-300 dark:text-gray-700 uppercase tracking-[0.5em] mb-2 italic">JangHup Production Cloud</p>
       </div>
     </div>
   );
