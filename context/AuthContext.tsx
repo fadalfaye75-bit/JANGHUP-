@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { User } from '../types';
 import { API } from '../services/api';
@@ -24,74 +23,88 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const initAuth = useCallback(async () => {
+  const fetchProfile = useCallback(async (userId: string, retryCount = 0): Promise<void> => {
     try {
-      setLoading(true);
-      // SRE CRITICAL: Always use getUser() which verifies JWT with the server.
-      // getSession() only reads from local storage and can be faked or expired.
-      const profile = await API.auth.getSession();
-      setUser(profile);
-    } catch (e) {
-      console.error("[SRE Auth Audit] Initialization failed:", e);
-      setUser(null);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        if (retryCount < 8) { // On augmente un peu les retries pour les connexions lentes
+          console.debug(`[Auth] Profil non prêt, tentative ${retryCount + 1}/8...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return fetchProfile(userId, retryCount + 1);
+        }
+        throw error;
+      }
+      
+      if (data) {
+        setUser(data);
+      }
+    } catch (e: any) {
+      console.error("Erreur profil:", e.message || "Inconnu");
+      // On ne met pas forcément user à null ici pour ne pas casser une session existante
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    // Theme initialization
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      setIsDarkMode(true);
-      document.documentElement.classList.add('dark');
-    }
+    let isMounted = true;
+
+    // Check initial session
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (isMounted) {
+        if (session) {
+          await fetchProfile(session.user.id);
+        } else {
+          setLoading(false);
+        }
+      }
+    };
 
     initAuth();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) return;
+      
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session) {
+        setLoading(true);
+        fetchProfile(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setAdminViewClass(null);
-        // Wipe storage on signout
-        localStorage.clear();
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (session?.user) {
-          const profile = await API.auth.getSession();
-          setUser(profile);
-        }
+        setLoading(false);
       }
     });
 
+    // Theme sync
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark');
+    }
+
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
-  }, [initAuth]);
+  }, [fetchProfile]);
 
   const login = async (email: string, pass: string) => {
-    const foundUser = await API.auth.login(email, pass);
-    setUser(foundUser);
+    const profile = await API.auth.login(email, pass);
+    if (profile) setUser(profile);
   };
 
   const logout = async () => {
-    try {
-      setLoading(true);
-      await supabase.auth.signOut();
-      
-      // Forced clean reset
-      setUser(null);
-      setAdminViewClass(null);
-      localStorage.clear();
-      sessionStorage.clear();
-      
-      // Reset navigation state
-      window.location.hash = '/login';
-      window.location.reload(); 
-    } catch (e) {
-      console.error("[SRE Security] Logout cleanup failed:", e);
-      window.location.reload();
-    }
+    await API.auth.logout();
+    setUser(null);
+    setAdminViewClass(null);
   };
 
   const updateCurrentUser = async (updates: Partial<User>) => {
@@ -109,11 +122,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
+  // Écran de chargement initial
   if (loading) {
     return (
-      <div id="app-loader">
-        <div className="spinner"></div>
-        <p className="mt-4 text-sm font-black text-gray-400 uppercase tracking-widest animate-pulse">Sécure Boot JANGHUP...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-gray-950">
+        <div className="w-12 h-12 border-4 border-primary-100 border-t-primary-500 rounded-full animate-spin"></div>
+        <p className="mt-6 text-[10px] font-black text-gray-400 uppercase tracking-widest animate-pulse">Session Sécurisée JangHup...</p>
       </div>
     );
   }

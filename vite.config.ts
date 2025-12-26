@@ -4,21 +4,16 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  define: {
-    // Permet d'utiliser process.env.API_KEY dans le code comme requis pour Gemini
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
+  // Fix: Configure esbuild to drop console and debugger in production.
+  // This replaces the previous terser configuration which was causing a 'No overload matches this call' error.
+  esbuild: {
+    drop: ['console', 'debugger'],
+    pure: ['console.debug', 'console.info']
   },
   build: {
     outDir: 'dist',
     sourcemap: false,
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.debug', 'console.info']
-      }
-    },
+    minify: 'esbuild',
     rollupOptions: {
       output: {
         manualChunks: {
@@ -27,8 +22,5 @@ export default defineConfig({
         }
       }
     }
-  },
-  server: {
-    historyApiFallback: true
   }
 });

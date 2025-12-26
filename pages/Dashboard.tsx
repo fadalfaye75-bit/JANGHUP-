@@ -100,7 +100,6 @@ export default function Dashboard() {
          </div>
          <div>
             <h2 className="text-5xl lg:text-7xl font-black text-gray-900 dark:text-white tracking-tighter italic uppercase leading-none">Bonjour, {user?.name?.split(' ')[0]}</h2>
-            <p className="text-lg text-gray-500 dark:text-gray-400 mt-6 font-medium italic">Accédez à vos ressources académiques centralisées sur JangHup.</p>
          </div>
       </div>
 

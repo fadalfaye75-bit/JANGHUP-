@@ -1,25 +1,22 @@
-
 import React, { lazy, Suspense, useEffect, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { NotificationProvider } from './context/NotificationContext.tsx';
-import { ChatProvider } from './context/ChatContext.tsx';
 import { Loader2, AlertCircle, RefreshCcw } from 'lucide-react';
 
 interface ErrorBoundaryProps { children?: ReactNode; }
 interface ErrorBoundaryState { hasError: boolean; }
 
+// Fix: Using a constructor to initialize state and ensure this.props is properly typed from the base class.
 class RootErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // Explicitly declaring state to fix component property errors
-  state: ErrorBoundaryState = { hasError: false };
-
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
   }
+
   static getDerivedStateFromError() { return { hasError: true }; }
+
   render() {
-    // Accessing state and props via 'this'
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 p-6 text-center">
@@ -32,6 +29,7 @@ class RootErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundar
         </div>
       );
     }
+    // Using this.props.children is standard for React class components.
     return this.props.children;
   }
 }
@@ -93,11 +91,9 @@ export default function App() {
     <RootErrorBoundary>
       <AuthProvider>
         <NotificationProvider>
-          <ChatProvider>
-            <HashRouter>
-              <AppRoutes />
-            </HashRouter>
-          </ChatProvider>
+          <HashRouter>
+            <AppRoutes />
+          </HashRouter>
         </NotificationProvider>
       </AuthProvider>
     </RootErrorBoundary>

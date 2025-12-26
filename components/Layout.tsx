@@ -4,9 +4,8 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Megaphone, Calendar, GraduationCap, Video, 
   BarChart2, Search, LogOut, Menu, Moon, Sun, 
-  ShieldCheck, UserCircle, Bell, Check, School, 
-  CheckCheck, Clock, BellRing, Settings,
-  MailCheck, Inbox
+  ShieldCheck, UserCircle, Bell, School, 
+  BellRing
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
@@ -78,25 +77,9 @@ export default function Layout() {
       setAllData({ anns, exams, schs });
       setIsDataLoaded(true);
     } catch (e) { 
-      console.warn("[Search Prefetch] Skipped - Auth transition."); 
+      console.warn("[Search Prefetch] Skipped."); 
     }
   }, [isDataLoaded, user]);
-
-  const searchResults = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-    if (query.length < 2) return { announcements: [], exams: [], schedules: [] };
-    const filterByAccess = (item: any) => {
-      const target = (item.className || item.classname || 'Général').toLowerCase().trim();
-      if (user?.role === UserRole.ADMIN) return true;
-      const userClass = (user?.className || '').toLowerCase().trim();
-      return target === userClass || target === 'général';
-    };
-    return {
-      announcements: allData.anns.filter(a => filterByAccess(a) && (a.title.toLowerCase().includes(query) || a.content.toLowerCase().includes(query))).slice(0, 4),
-      exams: allData.exams.filter(e => filterByAccess(e) && (e.subject.toLowerCase().includes(query))).slice(0, 4),
-      schedules: allData.schs.filter(s => filterByAccess(s) && (s.category.toLowerCase().includes(query))).slice(0, 4)
-    };
-  }, [searchQuery, allData, user]);
 
   const navItems = useMemo(() => {
     const items = [
@@ -107,7 +90,7 @@ export default function Layout() {
       { to: '/meet', icon: Video, label: 'Directs' },
       { to: '/polls', icon: BarChart2, label: 'Consultations' },
     ];
-    if (user?.role === UserRole.ADMIN) items.push({ to: '/admin', icon: ShieldCheck, label: 'Administration' } as any);
+    if (user?.role === UserRole.ADMIN) items.push({ to: '/admin', icon: ShieldCheck, label: 'Administration' });
     return items;
   }, [user?.role]);
 
@@ -175,38 +158,14 @@ export default function Layout() {
             
             <div className="relative flex-1 group hidden sm:block" ref={searchRef}>
               <div className="relative">
-                <Search className={`absolute left-5 top-1/2 -translate-y-1/2 transition-colors ${isSearchOpen ? 'text-primary-500' : 'text-gray-400'}`} size={20} />
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input 
-                  type="text" placeholder="Trouver un cours, un examen..." value={searchQuery}
-                  onFocus={() => { setIsSearchOpen(true); prefetchSearchData(); }}
+                  type="text" placeholder="Rechercher sur JangHup..."
+                  onFocus={prefetchSearchData}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-14 pr-12 py-3.5 bg-gray-50 dark:bg-gray-800/50 border-none rounded-2xl text-sm font-bold italic outline-none focus:ring-4 focus:ring-primary-50 dark:focus:ring-primary-900/10 transition-all duration-300"
+                  className="w-full pl-14 pr-12 py-3.5 bg-gray-50 dark:bg-gray-800/50 border-none rounded-2xl text-sm font-bold italic outline-none focus:ring-4 focus:ring-primary-50 transition-all duration-300"
                 />
               </div>
-              {isSearchOpen && searchQuery.length >= 2 && (
-                <div className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-gray-900 rounded-3xl shadow-premium border border-gray-100 dark:border-gray-800 overflow-hidden max-h-[70vh] overflow-y-auto animate-in fade-in slide-in-from-top-2">
-                   {searchResults.announcements.length > 0 && (
-                     <div className="p-4 border-b border-gray-50 dark:border-gray-800">
-                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-2">Annonces</p>
-                       {searchResults.announcements.map(a => (
-                         <div key={a.id} onClick={() => { navigate('/announcements'); setIsSearchOpen(false); }} className="block p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors cursor-pointer">
-                            <p className="text-sm font-bold italic text-gray-900 dark:text-white">{a.title}</p>
-                         </div>
-                       ))}
-                     </div>
-                   )}
-                   {searchResults.exams.length > 0 && (
-                     <div className="p-4 border-b border-gray-50 dark:border-gray-800">
-                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-2">Examens</p>
-                       {searchResults.exams.map(e => (
-                         <div key={e.id} onClick={() => { navigate('/exams'); setIsSearchOpen(false); }} className="block p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-2xl transition-colors cursor-pointer">
-                            <p className="text-sm font-bold italic text-gray-900 dark:text-white">{e.subject}</p>
-                         </div>
-                       ))}
-                     </div>
-                   )}
-                </div>
-              )}
             </div>
           </div>
 

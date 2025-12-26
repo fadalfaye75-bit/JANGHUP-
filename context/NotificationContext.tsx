@@ -1,19 +1,19 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import { AppNotification, Exam, UserRole } from '../types';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { AppNotification } from '../types';
 import { useAuth } from './AuthContext';
 import { API } from '../services/api';
-import { supabase } from '../services/supabaseClient';
 
 interface NotificationContextType {
   notifications: AppNotification[];
   unreadCount: number;
   permission: NotificationPermission;
   requestPermission: () => Promise<void>;
-  addNotification: (notification: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearNotifications: () => void;
+  // Added addNotification to NotificationContextType to allow components to trigger UI notifications
+  addNotification: (payload: { title: string; message: string; type: 'info' | 'success' | 'warning' | 'alert' }) => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -24,27 +24,6 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [permission, setPermission] = useState<NotificationPermission>(
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
   );
-  const notifiedItemsRef = useRef<Set<string>>(new Set());
-
-  const triggerBrowserNotification = useCallback((title: string, message: string, options?: NotificationOptions) => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      try {
-        const n = new Notification(title, {
-          body: message,
-          icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-          badge: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-          ...options
-        });
-        
-        n.onclick = () => {
-          window.focus();
-          n.close();
-        };
-      } catch (e) {
-        console.warn("Failed to trigger native notification", e);
-      }
-    }
-  }, []);
 
   const fetchNotifications = useCallback(async () => {
     if (!user) return;
@@ -52,146 +31,83 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       const allNotifs = await API.notifications.list();
       setNotifications(allNotifs);
     } catch (e) {
-      console.warn("Notification fetch failed");
+      console.warn("[Notifications] Sync issue.");
     }
   }, [user]);
-
-  const checkImminentExams = useCallback(async () => {
-    if (!user) return;
-    try {
-      const exams = await API.exams.list();
-      const now = new Date();
-      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      
-      const imminentExams = exams.filter(exam => {
-        const examDate = new Date(exam.date);
-        const targetClass = exam.className || 'Général';
-        const isForUser = targetClass === 'Général' || targetClass === user.className;
-        
-        return isForUser && examDate > now && examDate <= tomorrow && !notifiedItemsRef.current.has(`exam-${exam.id}`);
-      });
-
-      imminentExams.forEach(exam => {
-        const timeStr = new Date(exam.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        triggerBrowserNotification(
-          "📚 Examen Imminent !",
-          `Rappel : Ton épreuve de ${exam.subject} commence demain à ${timeStr}.`,
-          { tag: `exam-${exam.id}` }
-        );
-        notifiedItemsRef.current.add(`exam-${exam.id}`);
-      });
-    } catch (e) {
-      console.warn("Imminent exams check failed");
-    }
-  }, [user, triggerBrowserNotification]);
 
   useEffect(() => {
     if (!user) {
       setNotifications([]);
-      notifiedItemsRef.current = new Set();
       return;
     }
 
     fetchNotifications();
-    checkImminentExams();
 
-    // 1. Écouteur pour les alertes personnelles
-    const personalSub = supabase
-      .channel(`personal-notifs-${user.id}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'notifications',
-        filter: `target_user_id=eq.${user.id}`
-      }, (payload) => {
-        fetchNotifications();
-        triggerBrowserNotification(payload.new.title, payload.new.message);
-      })
-      .subscribe();
-
-    // 2. Écouteur global pour les nouvelles annonces
-    const announcementsSub = supabase
-      .channel('global-announcements')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'announcements' 
-      }, (payload) => {
-        const ann = payload.new;
-        const targetClass = ann.classname || 'Général';
-        if (targetClass === 'Général' || targetClass === user.className) {
-          triggerBrowserNotification(`📢 Nouvelle Annonce : ${ann.title}`, ann.content.substring(0, 100) + "...");
-          fetchNotifications(); // Refresh list
-        }
-      })
-      .subscribe();
-
-    // 3. Écouteur global pour les nouveaux sondages
-    const pollsSub = supabase
-      .channel('global-polls')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'polls' 
-      }, (payload) => {
-        const poll = payload.new;
-        const targetClass = poll.classname || 'Général';
-        if (targetClass === 'Général' || targetClass === user.className) {
-          triggerBrowserNotification(`🗳️ Nouveau Sondage : ${poll.question}`, "Votre avis compte ! Participez à la consultation.");
-        }
-      })
-      .subscribe();
-
-    const examInterval = setInterval(checkImminentExams, 3600000); // Check hourly
+    // Abonnement temps réel : RLS garantit que l'utilisateur n'entend que ses propres notifications
+    const subscription = API.notifications.subscribe(() => {
+      fetchNotifications();
+      // On pourrait déclencher une notification sonore système ici si la permission est accordée
+    });
 
     return () => {
-      personalSub.unsubscribe();
-      announcementsSub.unsubscribe();
-      pollsSub.unsubscribe();
-      clearInterval(examInterval);
+      subscription.unsubscribe();
     };
-  }, [user, fetchNotifications, triggerBrowserNotification, checkImminentExams]);
+  }, [user, fetchNotifications]);
 
   const requestPermission = async () => {
     if (typeof Notification === 'undefined') return;
     const result = await Notification.requestPermission();
     setPermission(result);
-    if (result === 'granted') {
-      triggerBrowserNotification("UniConnect ESP", "Génial ! Vous recevrez désormais les alertes en temps réel.");
-    }
-  };
-
-  const addNotification = async (notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>) => {
-    await API.notifications.add(notif);
   };
 
   const markAsRead = async (id: string) => {
-    await API.notifications.markRead(id);
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    try {
+      await API.notifications.markRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch (e) {
+      console.error("Mark read error");
+    }
   };
 
   const markAllAsRead = async () => {
-    await API.notifications.markAllRead();
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    try {
+      await API.notifications.markAllAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    } catch (e) {
+      console.error("Mark all as read error");
+    }
   };
 
   const clearNotifications = async () => {
-    await API.notifications.clear();
-    setNotifications([]);
+    if (!window.confirm("Voulez-vous supprimer tout votre historique d'alertes ?")) return;
+    try {
+      await API.notifications.clear();
+      setNotifications([]);
+    } catch (e) {
+      console.error("Clear error");
+    }
   };
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  // Implementation of addNotification to provide immediate UI feedback through local state
+  const addNotification = useCallback((payload: { title: string; message: string; type: 'info' | 'success' | 'warning' | 'alert' }) => {
+    const newNotif: AppNotification = {
+      id: Math.random().toString(36).substring(2, 9),
+      title: payload.title,
+      message: payload.message,
+      type: payload.type,
+      timestamp: new Date().toISOString(),
+      is_read: false,
+      target_user_id: user?.id || 'system'
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+  }, [user]);
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
     <NotificationContext.Provider value={{
-      notifications,
-      unreadCount,
-      permission,
-      requestPermission,
-      addNotification,
-      markAsRead,
-      markAllAsRead,
-      clearNotifications
+      notifications, unreadCount, permission, requestPermission,
+      markAsRead, markAllAsRead, clearNotifications, addNotification
     }}>
       {children}
     </NotificationContext.Provider>

@@ -1,16 +1,13 @@
-
 <!DOCTYPE html>
 <html lang="fr" class="scroll-smooth">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>JangHup - Portail Universitaire Officiel</title>
-    <meta name="description" content="Plateforme de gestion centralisée pour l'ESP Dakar.">
-    <meta name="theme-color" content="#0ea5e9">
+    <title>JangHup - Portail Universitaire ESP</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -27,13 +24,14 @@
               }
             },
             boxShadow: {
-              'soft': '0 20px 40px -15px rgba(0, 0, 0, 0.05)',
-              'premium': '0 30px 60px -15px rgba(0, 0, 0, 0.15)',
+              'premium': '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+              'soft': '0 10px 30px -10px rgba(0, 0, 0, 0.05)',
             }
           }
         }
       }
     </script>
+
     <script type="importmap">
 {
   "imports": {
@@ -44,9 +42,9 @@
     "react-router-dom": "https://esm.sh/react-router-dom@6.28.0?deps=react@18.3.1",
     "lucide-react": "https://esm.sh/lucide-react@0.460.0?deps=react@18.3.1",
     "recharts": "https://esm.sh/recharts@2.13.0?deps=react@18.3.1",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.46.1",
-    "@google/genai": "https://esm.sh/@google/genai@latest",
     "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "@google/genai": "https://esm.sh/@google/genai@1.3.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.1",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
     "vite": "https://esm.sh/vite@^7.3.0",
@@ -55,15 +53,15 @@
 }
 </script>
     <style>
-      * { transition: background-color 0.2s ease, border-color 0.2s ease; outline: none !important; -webkit-tap-highlight-color: transparent; }
-      body { background-color: #f8fafc; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+      body { background-color: #f8fafc; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
       .dark body { background-color: #020617; }
-      #app-init-loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #ffffff; z-index: 9999; }
-      .dark #app-init-loader { background: #020617; }
-      .spinner-v2 { width: 48px; height: 48px; border: 4px solid #f1f5f9; border-top: 4px solid #0ea5e9; border-radius: 50%; animation: spin 0.6s linear infinite; }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-      .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
-      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      #root { min-height: 100vh; }
+      .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+      .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+      .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; }
     </style>
   </head>
   <body>

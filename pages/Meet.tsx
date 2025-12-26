@@ -1,6 +1,8 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Video, ExternalLink, Plus, Trash2, Calendar, Copy, Loader2, Link as LinkIcon, Share2, Pencil, Search, Filter, Radio, Sparkles, Clock, ArrowRight, VideoOff, CheckCircle2, Save, MessageCircle, Mail } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { 
+  Video, Plus, Trash2, Loader2, Pencil, Radio, Clock, Copy, ChevronRight, Share2
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, MeetLink, ClassGroup } from '../types';
 import Modal from '../components/Modal';
@@ -8,17 +10,16 @@ import { useNotification } from '../context/NotificationContext';
 import { API } from '../services/api';
 
 const PLATFORM_ICONS = {
-  'Google Meet': { color: '#0ea5e9', bg: 'bg-blue-50' },
-  'Zoom': { color: '#2563eb', bg: 'bg-blue-100' },
-  'Teams': { color: '#4f46e5', bg: 'bg-indigo-100' },
-  'Other': { color: '#10b981', bg: 'bg-emerald-100' }
+  'Google Meet': { color: '#0ea5e9', bg: 'bg-blue-50', border: 'border-blue-100' },
+  'Zoom': { color: '#2563eb', bg: 'bg-indigo-50', border: 'border-indigo-100' },
+  'Teams': { color: '#4f46e5', bg: 'bg-violet-50', border: 'border-violet-100' },
+  'Autre': { color: '#10b981', bg: 'bg-emerald-50', border: 'border-emerald-100' }
 };
 
 export default function Meet() {
   const { user, adminViewClass } = useAuth();
   const { addNotification } = useNotification();
   const isMounted = useRef(true);
-  const themeColor = user?.themeColor || '#0ea5e9';
   
   const [meetings, setMeetings] = useState<MeetLink[]>([]);
   const [classes, setClasses] = useState<ClassGroup[]>([]);
@@ -26,23 +27,16 @@ export default function Meet() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
-  const [searchTerm, setSearchTerm] = useState('');
-  const [dayFilter, setSetDayFilter] = useState('all');
-  
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ title: '', platform: 'Google Meet', url: '', day: '', time: '', className: '' });
+  const [formData, setFormData] = useState({ 
+    title: '', platform: 'Google Meet', url: '', day: '', time: '', className: '' 
+  });
 
-  const canManage = user?.role === UserRole.ADMIN || user?.role === UserRole.DELEGATE;
   const isAdmin = user?.role === UserRole.ADMIN;
+  const isDelegate = user?.role === UserRole.DELEGATE;
+  const canPost = isAdmin || isDelegate;
 
-  useEffect(() => {
-    isMounted.current = true;
-    fetchMeetings();
-    API.classes.list().then(data => { if(isMounted.current) setClasses(data); });
-    return () => { isMounted.current = false; };
-  }, [user, adminViewClass]);
-
-  const fetchMeetings = async () => {
+  const fetchMeetings = useCallback(async () => {
     try {
       setLoading(true);
       const data = await API.meet.list();
@@ -52,259 +46,156 @@ export default function Meet() {
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  };
+  }, [addNotification]);
 
-  const displayedLinks = useMemo(() => {
-    return meetings.filter(link => {
-      const target = link.className || 'Général';
-      if (!isAdmin && target !== 'Général' && target !== user?.className) return false;
-      
-      const matchesSearch = link.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          link.platform.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesDay = dayFilter === 'all' || link.time.includes(dayFilter);
-      return matchesSearch && matchesDay;
-    });
-  }, [user, isAdmin, meetings, searchTerm, dayFilter]);
+  useEffect(() => {
+    isMounted.current = true;
+    fetchMeetings();
+    API.classes.list().then(data => { if(isMounted.current) setClasses(data); });
+    return () => { isMounted.current = false; };
+  }, [fetchMeetings]);
 
-  const handleCopy = (link: MeetLink) => {
-    navigator.clipboard.writeText(link.url).then(() => {
-      addNotification({ title: 'Lien copié', message: 'Vous pouvez maintenant le partager.', type: 'success' });
-    });
-  };
+  const handleCopy = useCallback((link: MeetLink) => {
+    const text = `🎥 Cours en direct : ${link.title}\n⏰ ${link.time}\n🔗 ${link.url}`;
+    navigator.clipboard.writeText(text);
+    addNotification({ title: 'Copié', message: 'Lien copié.', type: 'success' });
+  }, [addNotification]);
 
-  const handleShareWhatsApp = (link: MeetLink) => {
-    try {
-      const className = link.className || 'Filière';
-      const text = `🔵 *JangHup – ${className}*\n\n*📽️ SESSION EN DIRECT : ${link.title.toUpperCase()}*\n\n📅 *Horaire :* ${link.time}\n🧩 *Plateforme :* ${link.platform}\n\n🔗 *Lien de connexion :*\n${link.url}\n\n—\nPlateforme JangHup\nCommunication académique officielle`;
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-      API.interactions.incrementShare('meet_links', link.id).catch(() => {});
-    } catch (e) {
-      console.error("WhatsApp share failed", e);
-    }
-  };
+  const handleShare = useCallback((link: MeetLink) => {
+    const text = `🎥 *COURS EN DIRECT*\n\n📚 Matière : *${link.title}*\n⏰ Heure : *${link.time}*\n🔗 Lien : ${link.url}\n\n🎓 _Via JangHup ESP_`;
+    API.sharing.whatsapp(text);
+  }, []);
 
-  const handleShareEmail = (link: MeetLink) => {
-    try {
-      const targetClass = classes.find(c => c.name === link.className);
-      const recipient = targetClass?.email || '';
-      const className = link.className || 'Filière';
-      const subject = `[JangHup – ${className}] Session Direct : ${link.title}`;
-      const body = `🔵 JangHup – ${className}\n\n📽️ SESSION EN DIRECT : ${link.title.toUpperCase()}\n\n📅 Horaire : ${link.time}\n🧩 Plateforme : ${link.platform}\n\n🔗 Lien de connexion : ${link.url}\n\n—\nPlateforme JangHup\nCommunication académique officielle`;
-      
-      const mailtoLink = document.createElement('a');
-      mailtoLink.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      mailtoLink.click();
-      API.interactions.incrementShare('meet_links', link.id).catch(() => {});
-    } catch (e) {
-      console.error("Email share failed", e);
-    }
-  };
-
-  const openNewModal = () => {
-    setEditingId(null);
-    setFormData({ 
-      title: '', platform: 'Google Meet', url: '', day: '', time: '',
-      className: isAdmin ? '' : (user?.className || '')
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (link: MeetLink) => {
-    setEditingId(link.id);
-    const parts = link.time.split(' ');
-    setFormData({ 
-      title: link.title, platform: link.platform, url: link.url, 
-      day: parts[0] || '', time: parts[1] || '',
-      className: link.className
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const targetClass = isAdmin ? formData.className : (user?.className || 'Général');
-      const payload = { 
-        title: formData.title, platform: formData.platform as any, url: formData.url, 
-        time: `${formData.day} ${formData.time}`, className: targetClass 
-      };
-
-      if (editingId) await API.meet.update(editingId, payload);
-      else await API.meet.create(payload);
-      
-      fetchMeetings();
-      setIsModalOpen(false);
-      addNotification({ title: 'Succès', message: 'Salon mis à jour.', type: 'success' });
-    } catch (error) {
-      addNotification({ title: 'Erreur', message: "Action impossible.", type: 'alert' });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Fermer définitivement ce salon ?')) return;
+  const handleDelete = useCallback(async (id: string) => {
+    if (!window.confirm('Supprimer ce lien ?')) return;
     try {
       await API.meet.delete(id);
       fetchMeetings();
       addNotification({ title: 'Supprimé', message: 'Lien retiré.', type: 'info' });
     } catch (error) {
-      addNotification({ title: 'Erreur', message: "Échec suppression.", type: 'alert' });
+      addNotification({ title: 'Erreur', message: "Échec.", type: 'alert' });
     }
-  };
+  }, [fetchMeetings, addNotification]);
+
+  const filteredLinks = useMemo(() => {
+    return meetings.filter(link => {
+      const target = link.className || 'Général';
+      return isAdmin 
+        ? (adminViewClass ? (target === adminViewClass || target === 'Général') : true)
+        : (target === user?.className || target === 'Général');
+    });
+  }, [meetings, isAdmin, adminViewClass, user?.className]);
 
   if (loading) return (
-    <div className="flex flex-col justify-center items-center h-full gap-6">
-        <Loader2 className="animate-spin text-emerald-500" size={40} />
-        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest animate-pulse">Ouverture des salons...</span>
+    <div className="flex flex-col justify-center items-center py-24 gap-6">
+        <Loader2 className="animate-spin text-emerald-500" size={48} />
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest animate-pulse italic">Synchronisation...</p>
     </div>
   );
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10 pb-32 animate-fade-in">
-      {/* Header Section */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 border-b border-gray-100 dark:border-gray-800 pb-10">
-        <div className="flex items-center gap-5">
-           <div className="w-16 h-16 text-white rounded-[1.8rem] flex items-center justify-center shadow-xl rotate-3" style={{ backgroundColor: '#10b981' }}>
-              <Radio size={32} className="animate-pulse" />
-           </div>
+    <div className="max-w-7xl mx-auto space-y-12 pb-32 animate-fade-in px-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 border-b border-gray-100 dark:border-gray-800 pb-12">
+        <div className="flex items-center gap-6">
+           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-500 text-white rounded-[2.5rem] flex items-center justify-center shadow-premium"><Radio size={36} className="animate-pulse" /></div>
            <div>
-              <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter italic uppercase">Salons Virtuels</h2>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-3">Directs & Visioconférences • JangHup</p>
+              <h2 className="text-4xl sm:text-5xl font-black text-gray-900 dark:text-white tracking-tighter italic uppercase leading-none">Visioconférences</h2>
+              <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest mt-3">Centralisation ESP</p>
            </div>
         </div>
         
-        {canManage && (
-          <button onClick={openNewModal} className="w-full sm:w-auto flex items-center justify-center gap-3 bg-gray-900 text-white px-10 py-5 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all italic hover:bg-black">
-            <Plus size={20} /> Nouvelle session live
+        {canPost && (
+          <button 
+            onClick={() => { setEditingId(null); setFormData({ title: '', platform: 'Google Meet', url: '', day: '', time: '', className: isAdmin ? '' : (user?.className || '') }); setIsModalOpen(true); }} 
+            className="bg-gray-900 dark:bg-black text-white px-12 py-5 rounded-[2.5rem] text-[11px] font-black uppercase tracking-widest shadow-premium hover:bg-black transition-all italic flex items-center justify-center gap-3"
+          >
+            <Plus size={20} /> Programmer
           </button>
         )}
       </div>
 
-      {/* Control Bar */}
-      <div className="flex flex-col lg:flex-row gap-4 bg-white dark:bg-gray-900 p-4 rounded-[2.5rem] shadow-soft border border-gray-50 dark:border-gray-800">
-        <div className="relative flex-1 group">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={20} />
-          <input 
-            type="text" placeholder="Rechercher un module ou une plateforme..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-16 pr-6 py-4 bg-transparent border-none rounded-2xl text-sm font-bold outline-none italic"
-          />
-        </div>
-        <div className="flex gap-2">
-          <select value={dayFilter} onChange={e => setSetDayFilter(e.target.value)} className="px-6 py-4 bg-gray-50 dark:bg-gray-800 rounded-2xl text-[10px] font-black uppercase outline-none border-none cursor-pointer">
-             <option value="all">Tous les jours</option>
-             {['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'].map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {/* Grid of Meetings */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        {displayedLinks.map(link => {
-          const canModify = isAdmin || link.user_id === user?.id;
-          const platStyle = PLATFORM_ICONS[link.platform as keyof typeof PLATFORM_ICONS] || PLATFORM_ICONS['Other'];
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-10">
+        {filteredLinks.map(link => {
+          const plat = PLATFORM_ICONS[link.platform as keyof typeof PLATFORM_ICONS] || PLATFORM_ICONS['Autre'];
+          const canManage = isAdmin || (user?.id === link.user_id);
           
           return (
-            <div key={link.id} className="group relative bg-white dark:bg-gray-900 rounded-[3.5rem] p-10 shadow-soft border-2 border-transparent hover:border-emerald-100 transition-all flex flex-col overflow-hidden">
-               <div className="absolute top-0 left-0 w-2 h-full rounded-l-[3.5rem]" style={{ backgroundColor: platStyle.color }} />
-               <div className="absolute top-0 right-0 w-48 h-48 bg-gray-50 dark:bg-gray-800 -mr-24 -mt-24 rounded-full group-hover:scale-125 transition-transform duration-1000 opacity-20" />
+            <div key={link.id} className="group bg-white dark:bg-gray-900 rounded-[4rem] p-10 shadow-soft border-2 border-transparent hover:border-emerald-100 transition-all flex flex-col relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-2.5 h-full" style={{ backgroundColor: plat.color }} />
                
-               <div className="flex justify-between items-start mb-8 relative z-10">
-                  <span className={`text-[8px] font-black uppercase px-4 py-1.5 ${platStyle.bg} rounded-full tracking-widest shadow-sm`} style={{ color: platStyle.color }}>
+               <div className="flex justify-between items-start mb-10">
+                  <div className={`flex items-center gap-2 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ${plat.bg} ${plat.border}`} style={{ color: plat.color }}>
+                    <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: plat.color }} />
                     {link.platform}
-                  </span>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0">
-                      <button onClick={() => handleShareWhatsApp(link)} className="p-3 text-gray-400 hover:text-emerald-500 bg-gray-50 dark:bg-gray-800 rounded-xl" title="WhatsApp"><MessageCircle size={16}/></button>
-                      <button onClick={() => handleShareEmail(link)} className="p-3 text-gray-400 hover:text-gray-900 bg-gray-50 dark:bg-gray-800 rounded-xl" title="Email"><Mail size={16}/></button>
-                      <button onClick={() => handleCopy(link)} className="p-3 text-gray-400 hover:text-emerald-500 bg-gray-50 dark:bg-gray-800 rounded-xl" title="Copier le lien"><Copy size={16}/></button>
-                      {canModify && (
-                          <>
-                              <button onClick={() => handleEdit(link)} className="p-3 text-gray-400 hover:text-blue-500 bg-gray-50 dark:bg-gray-800 rounded-xl" title="Modifier"><Pencil size={16}/></button>
-                              <button onClick={() => handleDelete(link.id)} className="p-3 text-gray-400 hover:text-red-500 bg-gray-50 dark:bg-gray-800 rounded-xl" title="Supprimer"><Trash2 size={16}/></button>
-                          </>
-                      )}
+                  </div>
+                  <div className="flex gap-2">
+                     <button onClick={() => handleShare(link)} className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm"><Share2 size={18}/></button>
+                     <button onClick={() => handleCopy(link)} className="p-3 bg-gray-50 text-gray-500 rounded-xl hover:bg-gray-900 hover:text-white transition-all shadow-sm"><Copy size={18}/></button>
+                     {canManage && (
+                       <>
+                         <button onClick={() => { 
+                           setEditingId(link.id); 
+                           const parts = link.time.split(' à ');
+                           setFormData({ title: link.title, platform: link.platform, url: link.url, day: parts[0] || '', time: parts[1] || '', className: link.className });
+                           setIsModalOpen(true);
+                         }} className="p-3 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-500 hover:text-white transition-all shadow-sm"><Pencil size={18}/></button>
+                         <button onClick={() => handleDelete(link.id)} className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"><Trash2 size={18}/></button>
+                       </>
+                     )}
                   </div>
                </div>
 
-               <div className="flex-1 relative z-10">
-                  <h3 className="text-2xl font-black italic tracking-tighter leading-tight mb-4 group-hover:text-emerald-600 transition-colors">{link.title}</h3>
-                  <div className="flex flex-col gap-2 mb-10">
-                     <div className="flex items-center gap-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                        <Clock size={16} /> <span>{link.time}</span>
-                     </div>
-                     <div className="flex items-center gap-3 text-[10px] font-black text-primary-500 uppercase tracking-widest">
-                        <CheckCircle2 size={16} /> <span>{link.className || 'Public'}</span>
+               <div className="flex-1 space-y-4">
+                  <h3 className="text-2xl font-black italic tracking-tighter text-gray-900 dark:text-white leading-tight uppercase min-h-[3rem]">{link.title}</h3>
+                  <div className="flex flex-col gap-3 text-gray-500">
+                     <div className="flex items-center gap-3">
+                        <Clock size={18} className="text-emerald-500 shrink-0" />
+                        <span className="text-sm font-black italic text-gray-900 dark:text-white">{link.time}</span>
                      </div>
                   </div>
                </div>
 
-               <div className="mt-auto flex gap-3 relative z-10">
-                  <a href={link.url} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-3 bg-emerald-500 text-white py-5 rounded-[2rem] font-black shadow-xl uppercase italic text-[10px] tracking-widest hover:bg-emerald-600 transition-all active:scale-95">
-                    Accéder au direct <ExternalLink size={18} />
+               <div className="mt-12">
+                  <a href={link.url} target="_blank" rel="noreferrer" className="w-full flex items-center justify-center gap-4 bg-emerald-500 text-white py-6 rounded-[2.5rem] font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all italic active:scale-95 group/btn">
+                    Rejoindre <ChevronRight size={20} className="group-hover/btn:translate-x-1 transition-transform" />
                   </a>
                </div>
             </div>
           );
         })}
-
-        {displayedLinks.length === 0 && (
-           <div className="sm:col-span-2 lg:col-span-3 py-32 text-center bg-white dark:bg-gray-900 rounded-[4rem] border-2 border-dashed border-gray-100 dark:border-gray-800">
-              <VideoOff size={48} className="mx-auto text-gray-100 mb-6" />
-              <p className="text-sm font-black text-gray-400 uppercase tracking-widest italic">Aucun direct programmé pour le moment</p>
-           </div>
-        )}
       </div>
 
-      {/* Creation Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Modifier la session" : "Nouveau direct"}>
-        <form onSubmit={handleSubmit} className="space-y-8">
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Intitulé du cours / Événement</label>
-            <input required type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full px-6 py-4 rounded-2xl border-none bg-gray-50 dark:bg-gray-800 font-bold italic text-sm outline-none focus:ring-4 focus:ring-emerald-50" placeholder="ex: Séminaire Cybersécurité" />
-          </div>
-          
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Modifier" : "Nouveau"}>
+        <form onSubmit={async (e) => {
+          e.preventDefault();
+          setSubmitting(true);
+          try {
+            const payload = { ...formData, time: `${formData.day} à ${formData.time}`, className: isAdmin ? formData.className : (user?.className || 'Général') };
+            if (editingId) await API.meet.update(editingId, payload);
+            else await API.meet.create(payload);
+            fetchMeetings();
+            setIsModalOpen(false);
+            addNotification({ title: 'Succès', message: 'Salon publié.', type: 'success' });
+          } catch (error) { addNotification({ title: 'Erreur', message: "Échec.", type: 'alert' }); }
+          finally { setSubmitting(false); }
+        }} className="space-y-6">
+          <input required placeholder="Nom du cours" type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-800 border-none font-bold italic" />
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Plateforme</label>
-              <select required value={formData.platform} onChange={e => setFormData({...formData, platform: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-800 font-black text-[10px] uppercase outline-none border-none cursor-pointer">
+            <select value={formData.platform} onChange={e => setFormData({...formData, platform: e.target.value})} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase">
                  <option value="Google Meet">Google Meet</option>
                  <option value="Zoom">Zoom</option>
                  <option value="Teams">Teams</option>
-                 <option value="Other">Autre</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Lien de la réunion</label>
-              <input required type="url" value={formData.url} onChange={e => setFormData({...formData, url: e.target.value})} className="w-full px-6 py-4 rounded-2xl border-none bg-gray-50 dark:bg-gray-800 font-bold text-sm outline-none" placeholder="https://meet.google.com/..." />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Jour</label>
-              <select required value={formData.day} onChange={e => setFormData({...formData, day: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-800 font-black text-[10px] uppercase outline-none border-none cursor-pointer">
-                 <option value="">Sélectionner...</option>
-                 {['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'].map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Heure de début</label>
-              <input required type="time" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className="w-full px-6 py-4 rounded-2xl border-none bg-gray-50 dark:bg-gray-800 font-bold text-sm outline-none" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Audience</label>
-            <select disabled={!isAdmin} value={formData.className} onChange={e => setFormData({...formData, className: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-800 font-black text-[10px] uppercase outline-none border-none cursor-pointer">
-               <option value="Général">Public (Global)</option>
-               {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                 <option value="Autre">Autre</option>
             </select>
+            <input required type="time" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl" />
           </div>
-
-          <button type="submit" disabled={submitting} className="w-full bg-emerald-500 text-white font-black py-5 rounded-[2.5rem] shadow-xl uppercase tracking-[0.2em] italic text-xs hover:bg-emerald-600 transition-all active:scale-95 flex items-center justify-center gap-3">
-             {submitting ? <Loader2 className="animate-spin" /> : <Save size={20}/>}
-             {editingId ? "Sauvegarder les modifications" : "Publier le salon"}
+          <select required value={formData.day} onChange={e => setFormData({...formData, day: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-black text-[10px] uppercase">
+               <option value="">Jour...</option>
+               {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'].map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <input required placeholder="URL du lien" type="url" value={formData.url} onChange={e => setFormData({...formData, url: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl font-bold italic" />
+          <button type="submit" disabled={submitting} className="w-full bg-emerald-500 text-white font-black py-5 rounded-[2rem] shadow-xl uppercase italic text-[11px] tracking-widest">
+            {submitting ? <Loader2 className="animate-spin mx-auto" /> : "Publier"}
           </button>
         </form>
       </Modal>

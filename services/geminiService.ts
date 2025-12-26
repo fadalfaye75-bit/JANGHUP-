@@ -2,6 +2,7 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { API } from "./api";
 
+// Helper function to stream AI response using gemini-3-flash-preview
 export async function* generateAIResponseStream(prompt: string, context: string) {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -28,14 +29,16 @@ export async function* generateAIResponseStream(prompt: string, context: string)
       ? "Va droit au but, sans fioritures."
       : "Sois poli et serviable.";
 
+    // Combined instructions for the model
     const systemInstruction = `
-      ${settings.customInstructions}
+      ${settings.customInstructions || ""}
       Ton ton : ${toneInstruction}
       Niveau de détail : ${verbosityInstruction}
       Réponds toujours en français.
       Tu es l'assistant officiel de la plateforme JangHup pour l'ESP Dakar.
     `;
 
+    // Always use ai.models.generateContentStream to query GenAI with model and prompt
     const responseStream = await ai.models.generateContentStream({
       model: 'gemini-3-flash-preview',
       contents: `Context: ${context}\n\nUser Question: ${prompt}`,
@@ -46,8 +49,8 @@ export async function* generateAIResponseStream(prompt: string, context: string)
     });
 
     for await (const chunk of responseStream) {
+      // Access the extracted string output using the .text property
       const part = chunk as GenerateContentResponse;
-      // S'assurer de toujours renvoyer une chaîne de caractères
       const text = part.text;
       if (typeof text === 'string') {
         yield text;

@@ -1,7 +1,7 @@
 
 {
   "name": "janghup-esp",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,8 +15,6 @@
     "react-router-dom": "6.28.0",
     "lucide-react": "0.460.0",
     "recharts": "2.13.0",
-    "@supabase/supabase-js": "2.46.1",
-    "@google/genai": "latest",
     "xlsx": "0.18.5"
   },
   "devDependencies": {
