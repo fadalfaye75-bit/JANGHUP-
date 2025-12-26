@@ -379,8 +379,10 @@ export default function Profile() {
                           <FileText size={32} />
                         </div>
                         <div className="flex-1 min-w-0">
-                           <h4 className="text-xl font-black italic text-gray-900 dark:text-white truncate group-hover:text-emerald-600 transition-colors">{sch.category} - {sch.version}</h4>
-                           <p className="text-[10px] font-bold text-gray-400 uppercase mt-2 tracking-[0.2em]">{sch.className || 'ESP Global'} • MIS À JOUR LE {new Date(sch.uploadDate).toLocaleDateString()}</p>
+                           {/* Fix: Property 'category' and 'version' do not exist on type 'ScheduleFile'. Use 'name' instead. */}
+                           <h4 className="text-xl font-black italic text-gray-900 dark:text-white truncate group-hover:text-emerald-600 transition-colors">{sch.name}</h4>
+                           {/* Fix: Property 'uploadDate' does not exist on type 'ScheduleFile'. Use 'created_at' instead. */}
+                           <p className="text-[10px] font-bold text-gray-400 uppercase mt-2 tracking-[0.2em]">{sch.className || 'ESP Global'} • MIS À JOUR LE {new Date(sch.created_at).toLocaleDateString()}</p>
                         </div>
                         <div className="flex gap-3 relative z-10">
                            <a href={sch.url} target="_blank" rel="noreferrer" className="p-4 text-emerald-500 hover:text-white hover:bg-emerald-500 bg-emerald-50 dark:bg-red-900/10 rounded-2xl transition-all shadow-sm active:scale-90"><ExternalLink size={20}/></a>

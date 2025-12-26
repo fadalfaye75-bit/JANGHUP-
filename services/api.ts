@@ -16,12 +16,7 @@ export const API = {
         .eq('id', data.user.id)
         .single();
         
-      if (pError) {
-        if (pError.message.includes("recursion")) {
-          throw new Error("Erreur RLS : Boucle infinie détectée. Appliquez le script SQL avec SECURITY DEFINER.");
-        }
-        throw pError;
-      }
+      if (pError) throw pError;
       return profile;
     },
 
@@ -51,7 +46,6 @@ export const API = {
 
     createUser: async (userData: any) => {
       const newId = userData.id || crypto.randomUUID();
-      
       const { data, error } = await supabase.from('profiles').insert([{
         id: newId,
         name: userData.name,
@@ -61,39 +55,21 @@ export const API = {
         schoolName: userData.schoolName || 'ESP Dakar',
         themeColor: '#87CEEB'
       }]).select().single();
-      
-      if (error) {
-        if (error.code === '23503') {
-          throw new Error("Erreur de contrainte : Vous ne pouvez pas créer de profil manuellement sans compte Auth correspondant. Supprimez la contrainte 'profiles_id_fkey' en SQL ou utilisez l'inscription standard.");
-        }
-        if (error.message.includes("recursion")) {
-          throw new Error("Erreur RLS : Recursion détectée.");
-        }
-        throw error;
-      }
+      if (error) throw error;
       return data;
     }
   },
 
   announcements: {
     list: async (limit = 50): Promise<Announcement[]> => {
-      const { data, error } = await supabase
-        .from('announcements')
-        .select('*')
-        .order('date', { ascending: false })
-        .limit(limit);
+      const { data, error } = await supabase.from('announcements').select('*').order('date', { ascending: false }).limit(limit);
       if (error) throw error;
       return data || [];
     },
     create: async (ann: any) => {
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase.from('profiles').select('name').eq('id', user?.id).single();
-      const { error } = await supabase.from('announcements').insert([{
-        ...ann,
-        user_id: user?.id,
-        author: profile?.name || 'Admin',
-        date: new Date().toISOString()
-      }]);
+      const { error } = await supabase.from('announcements').insert([{ ...ann, user_id: user?.id, author: profile?.name || 'Admin', date: new Date().toISOString() }]);
       if (error) throw error;
     },
     update: async (id: string, updates: any) => {
@@ -135,10 +111,7 @@ export const API = {
         totalVotes: p.poll_votes?.length || 0,
         hasVoted: p.poll_votes?.some((v: any) => v.user_id === user?.id),
         userVoteOptionId: p.poll_votes?.find((v: any) => v.user_id === user?.id)?.option_id,
-        options: p.poll_options.map((o: any) => ({
-          ...o,
-          votes: p.poll_votes?.filter((v: any) => v.option_id === o.id).length || 0
-        }))
+        options: p.poll_options.map((o: any) => ({ ...o, votes: p.poll_votes?.filter((v: any) => v.option_id === o.id).length || 0 }))
       }));
     },
     vote: async (pollId: string, optionId: string) => {
@@ -203,22 +176,39 @@ export const API = {
   },
 
   schedules: {
-    list: async (className?: string): Promise<any[]> => {
+    list: async (className?: string): Promise<ScheduleFile[]> => {
       let query = supabase.from('schedule_files').select('*').order('created_at', { ascending: false });
-      if (className) query = query.eq('classname', className);
+      if (className) query = query.eq('className', className);
       const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
     getSlots: async (className: string): Promise<ScheduleSlot[]> => {
-      const { data, error } = await supabase.from('schedule_slots').select('*').eq('classname', className);
+      const { data, error } = await supabase.from('schedule_slots').select('*').eq('className', className);
       if (error) throw error;
       return data || [];
     },
     saveSlots: async (className: string, slots: ScheduleSlot[]) => {
-      await supabase.from('schedule_slots').delete().eq('classname', className);
-      const { error } = await supabase.from('schedule_slots').insert(slots.map(s => ({ ...s, classname: className })));
-      if (error) throw error;
+      // 1. Supprimer les anciens créneaux pour cette classe
+      const { error: delError } = await supabase.from('schedule_slots').delete().eq('className', className);
+      if (delError) throw delError;
+      
+      // 2. Insérer les nouveaux si la liste n'est pas vide
+      if (slots.length > 0) {
+        const { error: insError } = await supabase.from('schedule_slots').insert(
+          slots.map(s => ({
+            day: s.day,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            subject: s.subject,
+            teacher: s.teacher,
+            room: s.room,
+            color: s.color,
+            className: className
+          }))
+        );
+        if (insError) throw insError;
+      }
     },
     uploadFile: async (file: File, className: string) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -238,7 +228,7 @@ export const API = {
       const { error: dbError } = await supabase.from('schedule_files').insert([{
         name: file.name,
         url: publicUrl,
-        classname: className,
+        className: className,
         uploaded_by: user?.id
       }]);
 
@@ -257,13 +247,9 @@ export const API = {
     email: (to: string, subject: string, body: string) => {
       const recipient = to?.trim() ? to : 'administration@esp.sn';
       const mailtoUrl = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      
       const link = document.createElement('a');
       link.href = mailtoUrl;
-      link.target = "_self";
-      document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
     }
   },
 
@@ -331,7 +317,7 @@ export const API = {
     },
     send: async (receiverId: string, content: string) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('direct_messages').insert([{
+      const { error = await supabase.from('direct_messages').insert([{
         sender_id: user?.id,
         receiver_id: receiverId,
         content,

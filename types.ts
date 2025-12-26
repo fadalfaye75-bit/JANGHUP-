@@ -39,7 +39,6 @@ export interface Announcement {
   created_at?: string;
 }
 
-/* Added missing Exam interface */
 export interface Exam {
   id: string;
   subject: string;
@@ -51,7 +50,6 @@ export interface Exam {
   user_id?: string;
 }
 
-/* Added missing Poll interfaces */
 export interface PollOption {
   id: string;
   label: string;
@@ -71,7 +69,6 @@ export interface Poll {
   userVoteOptionId?: string | null;
 }
 
-/* Added missing MeetLink interface */
 export interface MeetLink {
   id: string;
   title: string;
@@ -82,19 +79,17 @@ export interface MeetLink {
   user_id: string;
 }
 
-/* Added missing Schedule types */
 export interface ScheduleFile {
   id: string;
-  user_id: string;
+  uploaded_by: string;
   url: string;
-  version: string;
-  category: string;
   className: string;
-  uploadDate: string;
+  name: string;
+  created_at: string;
 }
 
 export interface ScheduleSlot {
-  id: string;
+  id?: string;
   day: number;
   startTime: string;
   endTime: string;
@@ -102,10 +97,9 @@ export interface ScheduleSlot {
   teacher: string;
   room: string;
   color: string;
-  classname: string;
+  className: string;
 }
 
-/* Added missing ActivityLog interface */
 export interface ActivityLog {
   id: string;
   timestamp: string;
@@ -115,7 +109,6 @@ export interface ActivityLog {
   type: 'security' | 'action';
 }
 
-/* Added missing Grade interface */
 export interface Grade {
   id: string;
   user_id: string;
@@ -127,7 +120,6 @@ export interface Grade {
   comment?: string;
 }
 
-/* Added missing DirectMessage interface */
 export interface DirectMessage {
   id: string;
   sender_id: string;
