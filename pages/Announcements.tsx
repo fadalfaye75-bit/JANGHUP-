@@ -54,14 +54,15 @@ export default function Announcements() {
     return () => sub.unsubscribe();
   }, [fetchAll]);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    if (newAnn.title.trim().length < 5) newErrors.title = "Le titre doit faire au moins 5 caractères.";
-    if (newAnn.content.trim().length < 10) newErrors.content = "Le contenu est trop court pour être informatif.";
-    if (!newAnn.className) newErrors.className = "Veuillez sélectionner une cible.";
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  // Validation en temps réel
+  const validateField = (name: string, value: string) => {
+    let error = "";
+    if (name === 'title') {
+      if (value.trim().length < 5) error = "Titre trop court (min 5 car.)";
+    } else if (name === 'content') {
+      if (value.trim().length < 10) error = "Contenu trop court (min 10 car.)";
+    }
+    setErrors(prev => ({ ...prev, [name]: error }));
   };
 
   const handleCopy = (text: string) => {
@@ -99,7 +100,12 @@ export default function Announcements() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    
+    // Final validation before submission
+    if (newAnn.title.length < 5 || newAnn.content.length < 10) {
+      addNotification({ title: 'Formulaire incomplet', message: 'Veuillez vérifier les champs en rouge.', type: 'warning' });
+      return;
+    }
     
     setSubmitting(true);
     try {
@@ -242,43 +248,61 @@ export default function Announcements() {
           </div>
 
           <div className="space-y-6">
-            {/* Title Field */}
+            {/* Title Field with error handling */}
             <div className="space-y-2">
               <div className="flex justify-between items-center ml-1">
                 <label className="text-[10px] font-black uppercase text-slate-400 italic flex items-center gap-2">
                   <Type size={12} /> Titre de l'annonce
                 </label>
-                {errors.title && <span className="text-[9px] font-bold text-rose-500 flex items-center gap-1 animate-pulse"><AlertCircle size={10} /> {errors.title}</span>}
+                {errors.title && (
+                  <span className="text-[9px] font-bold text-rose-500 flex items-center gap-1 animate-fade-in">
+                    <AlertCircle size={10} /> {errors.title}
+                  </span>
+                )}
               </div>
               <input 
                 required 
                 placeholder="ex: Rappel : Inscriptions pédagogiques..." 
                 value={newAnn.title} 
-                onChange={e => { setNewAnn({...newAnn, title: e.target.value}); if(errors.title) validateForm(); }} 
-                className={`w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all ${errors.title ? 'border-rose-100 bg-rose-50/20' : 'border-transparent focus:border-brand focus:ring-4 focus:ring-brand-50'}`} 
+                onFocus={() => validateField('title', newAnn.title)}
+                onChange={e => {
+                  setNewAnn({...newAnn, title: e.target.value});
+                  validateField('title', e.target.value);
+                }} 
+                style={{ borderColor: errors.title ? '#fb7185' : 'transparent' }}
+                className={`w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all focus:border-brand focus:ring-4 focus:ring-brand-50`} 
               />
             </div>
 
-            {/* Content Field */}
+            {/* Content Field with error handling */}
             <div className="space-y-2">
               <div className="flex justify-between items-center ml-1">
                 <label className="text-[10px] font-black uppercase text-slate-400 italic flex items-center gap-2">
                   <FileText size={12} /> Message détaillé
                 </label>
-                {errors.content && <span className="text-[9px] font-bold text-rose-500 flex items-center gap-1 animate-pulse"><AlertCircle size={10} /> {errors.content}</span>}
+                {errors.content && (
+                  <span className="text-[9px] font-bold text-rose-500 flex items-center gap-1 animate-fade-in">
+                    <AlertCircle size={10} /> {errors.content}
+                  </span>
+                )}
               </div>
               <textarea 
                 required 
                 placeholder="Décrivez précisément l'annonce..." 
                 rows={5} 
                 value={newAnn.content} 
-                onChange={e => { setNewAnn({...newAnn, content: e.target.value}); if(errors.content) validateForm(); }} 
-                className={`w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all ${errors.content ? 'border-rose-100 bg-rose-50/20' : 'border-transparent focus:border-brand focus:ring-4 focus:ring-brand-50'}`} 
+                onFocus={() => validateField('content', newAnn.content)}
+                onChange={e => {
+                  setNewAnn({...newAnn, content: e.target.value});
+                  validateField('content', e.target.value);
+                }} 
+                style={{ borderColor: errors.content ? '#fb7185' : 'transparent' }}
+                className={`w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all focus:border-brand focus:ring-4 focus:ring-brand-50`} 
               />
             </div>
           </div>
 
-          {/* Settings Grid */}
+          {/* Priority & Class Settings */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Degré d'Urgence</label>
@@ -317,7 +341,7 @@ export default function Announcements() {
             </div>
           </div>
 
-          {/* Resources Section */}
+          {/* Links Section */}
           <div className="p-6 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-100 dark:border-slate-800 space-y-4">
             <div className="flex items-center justify-between">
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] flex items-center gap-2">
@@ -366,9 +390,12 @@ export default function Announcements() {
 
           <button 
             type="submit" 
-            disabled={submitting} 
-            className="w-full py-5 bg-slate-900 dark:bg-brand text-white rounded-[2.5rem] font-black uppercase text-[11px] tracking-widest shadow-premium active:scale-95 transition-all flex items-center justify-center gap-3 italic group"
-            style={{ backgroundColor: submitting ? undefined : themeColor, boxShadow: submitting ? undefined : `0 20px 40px -15px ${themeColor}55` }}
+            disabled={submitting || !!errors.title || !!errors.content} 
+            className="w-full py-5 bg-slate-900 dark:bg-brand text-white rounded-[2.5rem] font-black uppercase text-[11px] tracking-widest shadow-premium active:scale-95 transition-all flex items-center justify-center gap-3 italic group disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ 
+              backgroundColor: submitting ? undefined : themeColor, 
+              boxShadow: submitting ? undefined : `0 20px 40px -15px ${themeColor}55` 
+            }}
           >
             {submitting ? (
               <Loader2 className="animate-spin" size={20} />

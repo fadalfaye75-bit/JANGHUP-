@@ -1,7 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { User } from '../types';
 import { API } from '../services/api';
 import { supabase } from '../services/supabaseClient';
+import { AlertTriangle, RefreshCcw } from 'lucide-react';
 
 interface AuthContextType {
   user: User | null;
@@ -22,6 +24,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [adminViewClass, setAdminViewClass] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [rlsError, setRlsError] = useState<string | null>(null);
 
   const fetchProfile = useCallback(async (userId: string, retryCount = 0): Promise<void> => {
     try {
@@ -32,8 +35,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .single();
       
       if (error) {
-        if (retryCount < 8) { // On augmente un peu les retries pour les connexions lentes
-          console.debug(`[Auth] Profil non prêt, tentative ${retryCount + 1}/8...`);
+        if (error.message.includes("recursion")) {
+          setRlsError("Erreur critique de base de données (RLS Recursion). Veuillez appliquer le script SQL correct.");
+          setLoading(false);
+          return;
+        }
+
+        if (retryCount < 3) { 
           await new Promise(resolve => setTimeout(resolve, 1000));
           return fetchProfile(userId, retryCount + 1);
         }
@@ -42,10 +50,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (data) {
         setUser(data);
+        setRlsError(null);
       }
     } catch (e: any) {
-      console.error("Erreur profil:", e.message || "Inconnu");
-      // On ne met pas forcément user à null ici pour ne pas casser une session existante
+      console.error("Erreur profil fatal:", e.message);
     } finally {
       setLoading(false);
     }
@@ -54,7 +62,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     let isMounted = true;
 
-    // Check initial session
     const initAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (isMounted) {
@@ -68,7 +75,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     initAuth();
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isMounted) return;
       
@@ -82,10 +88,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
-    // Theme sync
     const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+    if (savedTheme === 'dark') {
       setIsDarkMode(true);
       document.documentElement.classList.add('dark');
     }
@@ -122,12 +126,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
-  // Écran de chargement initial
+  if (rlsError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-rose-50 dark:bg-slate-950 p-10 text-center">
+        <div className="w-20 h-20 bg-rose-500 text-white rounded-[2rem] flex items-center justify-center shadow-xl mb-8 animate-bounce">
+          <AlertTriangle size={40} />
+        </div>
+        <h1 className="text-3xl font-black uppercase italic text-slate-900 dark:text-white tracking-tighter mb-4">Erreur de Configuration</h1>
+        <p className="text-slate-500 dark:text-slate-400 max-w-md text-sm font-medium italic mb-10 leading-relaxed">
+          {rlsError}
+        </p>
+        <button onClick={() => window.location.reload()} className="flex items-center gap-3 px-10 py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-premium active:scale-95 transition-all italic">
+          <RefreshCcw size={18} /> Réessayer la connexion
+        </button>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-gray-950">
-        <div className="w-12 h-12 border-4 border-primary-100 border-t-primary-500 rounded-full animate-spin"></div>
-        <p className="mt-6 text-[10px] font-black text-gray-400 uppercase tracking-widest animate-pulse">Session Sécurisée JangHup...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-slate-950">
+        <div className="w-16 h-16 border-4 border-slate-100 border-t-brand rounded-full animate-spin shadow-inner"></div>
+        <p className="mt-8 text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse italic">Synchronisation JangHup...</p>
       </div>
     );
   }

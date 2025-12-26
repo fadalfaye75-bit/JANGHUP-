@@ -9,6 +9,7 @@ import { UserRole, ScheduleSlot } from '../types';
 import { useNotification } from '../context/NotificationContext';
 import { API } from '../services/api';
 import Modal from '../components/Modal';
+import * as XLSX from 'xlsx';
 
 const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 const TIME_SLOTS = [
@@ -27,6 +28,7 @@ export default function Schedule() {
   const { user } = useAuth();
   const { addNotification } = useNotification();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importExcelRef = useRef<HTMLInputElement>(null);
   
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
@@ -75,11 +77,59 @@ export default function Schedule() {
       addNotification({ title: 'Succès', message: 'Document téléversé avec succès.', type: 'success' });
       fetchData(true);
     } catch (error: any) {
-      addNotification({ title: 'Erreur', message: "Échec du téléversement. Vérifiez les permissions du Storage Supabase.", type: 'alert' });
+      addNotification({ title: 'Erreur', message: "Échec du téléversement.", type: 'alert' });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        // Tentative de mapping intelligent des colonnes
+        const importedSlots: ScheduleSlot[] = data.map((row: any, idx: number) => {
+          const dayName = row.Jour || row.Day || "";
+          const dayIdx = DAYS.findIndex(d => d.toLowerCase() === dayName.toString().toLowerCase());
+          
+          return {
+            id: `import-${idx}-${Date.now()}`,
+            day: dayIdx !== -1 ? dayIdx : 0,
+            startTime: row.Début || row.Start || "08:00",
+            endTime: row.Fin || row.End || "09:00",
+            subject: row.Matière || row.Subject || "Matière",
+            teacher: row.Professeur || row.Teacher || "À définir",
+            room: row.Salle || row.Room || "À définir",
+            color: themeColor,
+            classname: currentClassName
+          } as ScheduleSlot;
+        });
+
+        if (importedSlots.length > 0) {
+          setSlots(importedSlots);
+          setHasUnsavedChanges(true);
+          addNotification({ 
+            title: 'Excel Importé', 
+            message: `${importedSlots.length} créneaux détectés. N'oubliez pas de publier.`, 
+            type: 'success' 
+          });
+        }
+      } catch (err) {
+        addNotification({ title: 'Erreur Import', message: "Format Excel non reconnu ou corrompu.", type: 'alert' });
+      }
+    };
+    reader.readAsBinaryString(file);
+    if (importExcelRef.current) importExcelRef.current.value = '';
   };
 
   const handleShareWhatsApp = () => {
@@ -88,7 +138,6 @@ export default function Schedule() {
   };
 
   const handleShareEmail = () => {
-    // Correction de la recherche : normalisation du nom de la classe
     const classObj = classes.find(c => c.name.trim().toLowerCase() === currentClassName.trim().toLowerCase());
     const to = classObj?.email || '';
     
@@ -97,7 +146,7 @@ export default function Schedule() {
     }
 
     const subject = `📅 MISE À JOUR EMPLOI DU TEMPS: ${currentClassName}`;
-    const body = `Bonjour,\n\nL'emploi du temps de la classe ${currentClassName} a été actualisé sur le portail JangHup ESP.\n\nLien d'accès: ${window.location.origin}\n\n🎓 Cordialement,\nLe portail JangHup`;
+    const body = `Bonjour,\n\nL'emploi du temps de la classe ${currentClassName} a été actualisé sur le portail JangHup ESP.\n\n🎓 Cordialement,\nLe portail JangHup`;
     
     API.sharing.email(to, subject, body);
   };
@@ -229,14 +278,24 @@ export default function Schedule() {
           {canEdit && (
             <>
               <div className="h-10 w-[1px] bg-slate-100 dark:bg-slate-800 mx-2 hidden sm:block" />
-              <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,image/*" />
+              <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf,image/*,.xlsx,.xls,.csv" />
+              <input type="file" ref={importExcelRef} onChange={handleImportExcel} className="hidden" accept=".xlsx,.xls,.csv" />
+              
+              <button 
+                onClick={() => importExcelRef.current?.click()} 
+                className="bg-white dark:bg-slate-800 text-brand px-8 py-5 rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center gap-3 active:scale-95 transition-all italic border border-brand/20"
+              >
+                <FileSpreadsheet size={18} /> Importer Grille
+              </button>
+
               <button 
                 onClick={() => fileInputRef.current?.click()} 
                 disabled={uploading} 
                 className="bg-slate-900 dark:bg-slate-800 text-white px-8 py-5 rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center gap-3 active:scale-95 transition-all italic hover:bg-black"
               >
-                {uploading ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />} Téléverser PDF/IMG
+                {uploading ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />} PDF / Image
               </button>
+
               {hasUnsavedChanges && (
                 <button onClick={handleSaveSlots} disabled={saving} className="bg-emerald-500 text-white px-10 py-5 rounded-3xl text-[10px] font-black uppercase tracking-widest shadow-premium flex items-center gap-3 animate-pulse">
                   {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Publier Grille
@@ -279,29 +338,34 @@ export default function Schedule() {
         </div>
 
         <div className="space-y-8">
-           <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-[0.3em] italic px-2">Documents (PDF/Images)</h3>
+           <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-[0.3em] italic px-2">Ressources & Fichiers</h3>
            <div className="space-y-4">
-              {documents.length > 0 ? documents.map(doc => (
-                <div key={doc.id} className="bg-white dark:bg-slate-900 p-6 rounded-4xl shadow-soft border border-slate-50 dark:border-slate-800 group transition-all hover:shadow-premium">
-                   <div className="flex items-center gap-4 mb-6">
-                      <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors"><FileText size={24}/></div>
-                      <div className="min-w-0 flex-1">
-                         <p className="text-sm font-black italic text-slate-900 dark:text-white truncate uppercase">{doc.name}</p>
-                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{new Date(doc.created_at).toLocaleDateString()}</p>
-                      </div>
-                   </div>
-                   <div className="flex gap-2">
-                      <a href={doc.url} target="_blank" rel="noreferrer" className="flex-1 py-3 bg-slate-50 dark:bg-slate-800 hover:bg-brand hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest text-center transition-all shadow-sm">
-                        Ouvrir
-                      </a>
-                      {canEdit && (
-                        <button onClick={() => { if(confirm('Supprimer ce fichier ?')) API.schedules.deleteFile(doc.id).then(() => fetchData(true)); }} className="p-3 bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all shadow-sm">
-                          <Trash2 size={16}/>
-                        </button>
-                      )}
-                   </div>
-                </div>
-              )) : (
+              {documents.length > 0 ? documents.map(doc => {
+                const isExcel = doc.name.match(/\.(xlsx|xls|csv)$/i);
+                return (
+                  <div key={doc.id} className="bg-white dark:bg-slate-900 p-6 rounded-4xl shadow-soft border border-slate-50 dark:border-slate-800 group transition-all hover:shadow-premium">
+                     <div className="flex items-center gap-4 mb-6">
+                        <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-slate-400 group-hover:text-brand transition-colors">
+                          {isExcel ? <FileSpreadsheet size={24}/> : <FileText size={24}/>}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                           <p className="text-sm font-black italic text-slate-900 dark:text-white truncate uppercase">{doc.name}</p>
+                           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{new Date(doc.created_at).toLocaleDateString()}</p>
+                        </div>
+                     </div>
+                     <div className="flex gap-2">
+                        <a href={doc.url} target="_blank" rel="noreferrer" className="flex-1 py-3 bg-slate-50 dark:bg-slate-800 hover:bg-brand hover:text-white rounded-xl text-[9px] font-black uppercase tracking-widest text-center transition-all shadow-sm">
+                          Ouvrir
+                        </a>
+                        {canEdit && (
+                          <button onClick={() => { if(confirm('Supprimer ce fichier ?')) API.schedules.deleteFile(doc.id).then(() => fetchData(true)); }} className="p-3 bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all shadow-sm">
+                            <Trash2 size={16}/>
+                          </button>
+                        )}
+                     </div>
+                  </div>
+                )
+              }) : (
                 <div className="p-10 bg-slate-50 dark:bg-slate-800/20 rounded-[3rem] text-center border-2 border-dashed border-slate-100 dark:border-slate-700">
                    <FileText size={32} className="mx-auto mb-4 text-slate-200" />
                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic leading-tight">Aucun document téléversé</p>
@@ -356,7 +420,8 @@ export default function Schedule() {
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Fin</label>
                 <select value={selectedSlot.endTime} onChange={e => setSelectedSlot({...selectedSlot, endTime: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-black text-[10px] uppercase outline-none border-none">
-                  {TIME_SLOTS.map(t => <option key={t} value={t}>{t}</option>)}
+                  {TIME_SLOTS.map(t => <option key={t} value={t}>{t}</option>
+                  )}
                   <option value="19:00">19:00</option>
                   <option value="20:00">20:00</option>
                 </select>

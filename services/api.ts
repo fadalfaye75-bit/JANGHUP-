@@ -10,13 +10,18 @@ export const API = {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
       if (error) throw error;
       
-      let profile = null;
-      for (let i = 0; i < 5; i++) {
-        const { data: p } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-        if (p) { profile = p; break; }
-        await new Promise(res => setTimeout(res, 200 * Math.pow(2, i)));
+      const { data: profile, error: pError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+        
+      if (pError) {
+        if (pError.message.includes("recursion")) {
+          throw new Error("Erreur RLS : Boucle infinie détectée. Appliquez le script SQL avec SECURITY DEFINER.");
+        }
+        throw pError;
       }
-      if (!profile) throw new Error("Profil introuvable après connexion.");
       return profile;
     },
 
@@ -34,21 +39,21 @@ export const API = {
     },
 
     getUsers: async (): Promise<User[]> => {
-      const { data, error } = await supabase.from('profiles').select('id, name, email, role, className, themeColor').order('name');
+      const { data, error } = await supabase.from('profiles').select('*').order('name');
       if (error) throw error;
       return data || [];
     },
 
     deleteUser: async (id: string) => {
-      // Suppression du profil dans la table publique (Auth nécessite l'admin SDK, donc on gère au moins le profil ici)
       const { error } = await supabase.from('profiles').delete().eq('id', id);
       if (error) throw error;
     },
 
     createUser: async (userData: any) => {
-      // Note: Pour créer un compte complet (Auth), il faut normalement utiliser signUp.
-      // Ici on insère dans profiles pour la gestion admin locale.
+      const newId = userData.id || crypto.randomUUID();
+      
       const { data, error } = await supabase.from('profiles').insert([{
+        id: newId,
         name: userData.name,
         email: userData.email,
         role: userData.role,
@@ -56,7 +61,16 @@ export const API = {
         schoolName: userData.schoolName || 'ESP Dakar',
         themeColor: '#87CEEB'
       }]).select().single();
-      if (error) throw error;
+      
+      if (error) {
+        if (error.code === '23503') {
+          throw new Error("Erreur de contrainte : Vous ne pouvez pas créer de profil manuellement sans compte Auth correspondant. Supprimez la contrainte 'profiles_id_fkey' en SQL ou utilisez l'inscription standard.");
+        }
+        if (error.message.includes("recursion")) {
+          throw new Error("Erreur RLS : Recursion détectée.");
+        }
+        throw error;
+      }
       return data;
     }
   },
@@ -182,7 +196,10 @@ export const API = {
       const { error } = await supabase.from('classes').update(updates).eq('id', id);
       if (error) throw error;
     },
-    delete: async (id: string) => supabase.from('classes').delete().eq('id', id)
+    delete: async (id: string) => {
+      const { error } = await supabase.from('classes').delete().eq('id', id);
+      if (error) throw error;
+    }
   },
 
   schedules: {
@@ -241,7 +258,6 @@ export const API = {
       const recipient = to?.trim() ? to : 'administration@esp.sn';
       const mailtoUrl = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       
-      // Solution plus robuste pour mobile et web
       const link = document.createElement('a');
       link.href = mailtoUrl;
       link.target = "_self";
