@@ -69,8 +69,9 @@ export default function Layout() {
   const prefetchSearchData = useCallback(async () => {
     if (isDataLoaded || !user) return;
     try {
+      // Fix: Corrected API arguments and methods
       const [anns, exams, schs] = await Promise.all([
-        API.announcements.list(0, 100),
+        API.announcements.list(100),
         API.exams.list(),
         API.schedules.list()
       ]);

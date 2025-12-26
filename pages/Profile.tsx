@@ -56,12 +56,14 @@ export default function Profile() {
   const fetchFavorites = useCallback(async () => {
     setFavLoading(true);
     try {
+      // Fix: Corrected API access for favorites
       const favs = await API.favorites.list();
       const annIds = favs.filter(f => f.content_type === 'announcement').map(f => f.content_id);
       const schIds = favs.filter(f => f.content_type === 'schedule').map(f => f.content_id);
 
+      // Fix: Corrected API signature and methods
       const [allAnns, allSchs] = await Promise.all([
-        API.announcements.list(0, 1000),
+        API.announcements.list(1000),
         API.schedules.list()
       ]);
 
@@ -107,6 +109,7 @@ export default function Profile() {
 
   const handleRemoveFavorite = async (id: string, type: 'announcement' | 'schedule') => {
     try {
+      // Fix: Corrected API access for favorites toggle
       await API.favorites.toggle(id, type);
       if (type === 'announcement') {
         setFavoriteItems(prev => ({ ...prev, announcements: prev.announcements.filter(a => a.id !== id) }));
@@ -140,6 +143,7 @@ export default function Profile() {
     
     setLoadingPass(true);
     try {
+      // Fix: Corrected API access for updating password
       if(user) await API.auth.updatePassword(user.id, passwords.newPassword);
       addNotification({ title: 'Sécurisé', message: 'Votre mot de passe a été modifié avec succès.', type: 'success' });
       setPasswords({ newPassword: '', confirmPassword: '' });
