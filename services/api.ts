@@ -124,7 +124,7 @@ export const API = {
     },
     vote: async (pollId: string, optionId: string) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('poll_votes').upsert({ poll_id: pollId, user_id: user?.id, option_id: optionId }, { onConflict: 'poll_id,user_id' });
+      const { error = null } = await supabase.from('poll_votes').upsert({ poll_id: pollId, user_id: user?.id, option_id: optionId }, { onConflict: 'poll_id,user_id' });
       if (error) throw error;
     },
     create: async (poll: any) => {
@@ -153,7 +153,7 @@ export const API = {
     },
     create: async (meet: any) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('meet_links').insert([{ ...meet, user_id: user?.id }]);
+      const { error = null } = await supabase.from('meet_links').insert([{ ...meet, user_id: user?.id }]);
       if (error) throw error;
     },
     update: async (id: string, updates: any) => {
@@ -169,8 +169,8 @@ export const API = {
       if (error) throw error;
       return data || [];
     },
-    create: async (name: string, email: string, color: string) => {
-      const { error } = await supabase.from('classes').insert([{ name, email, color }]);
+    create: async (name: string, color: string) => {
+      const { error } = await supabase.from('classes').insert([{ name, color }]);
       if (error) throw error;
     },
     update: async (id: string, updates: any) => {
@@ -280,13 +280,6 @@ export const API = {
   sharing: {
     whatsapp: (text: string) => {
       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-    },
-    email: (to: string, subject: string, body: string) => {
-      const recipient = to?.trim() ? to : 'administration@esp.sn';
-      const mailtoUrl = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      const link = document.createElement('a');
-      link.href = mailtoUrl;
-      link.click();
     }
   },
 
@@ -347,7 +340,7 @@ export const API = {
   messaging: {
     list: async (): Promise<DirectMessage[]> => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { data, error } = await supabase
+      const { data, error = null } = await supabase
         .from('direct_messages')
         .select('*')
         .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`)

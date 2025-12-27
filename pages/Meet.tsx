@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
-  Video, Plus, Trash2, Loader2, Pencil, Radio, Clock, Copy, ChevronRight, Share2, Globe, Link2, MessageCircle, Mail
+  Video, Plus, Trash2, Loader2, Pencil, Radio, Clock, Copy, ChevronRight, Share2, Globe, Link2, MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, MeetLink, ClassGroup } from '../types';
@@ -59,14 +59,6 @@ export default function Meet() {
     const text = `🎥 *DIRECT ACADÉMIQUE JANGHUP*\n\n📘 *${link.title}*\n⏰ ${link.time}\n🔗 Lien : ${link.url}\n\n👉 Connectez-vous à l'heure !\n— JANGHUP\nPlateforme académique officielle`;
     API.sharing.whatsapp(text);
   }, []);
-
-  const handleShareEmail = useCallback((link: MeetLink) => {
-    const classObj = classes.find(c => c.name === link.classname);
-    const to = classObj?.email || '';
-    const subject = `🎥 [Direct] ${link.title} – JANGHUP`;
-    const body = `Bonjour,\n\nUn nouveau cours en direct a été programmé sur la plateforme JANGHUP.\n\nDétails :\n\n📘 Matière : ${link.title}\n📅 Date : ${link.time}\n🔗 Lien d'accès : ${link.url}\n\nNous vous prions d'être ponctuel.\n\nCordialement,\n\n— JANGHUP\nPlateforme académique officielle`;
-    API.sharing.email(to, subject, body);
-  }, [classes]);
 
   const handleCopy = useCallback((link: MeetLink) => {
     const text = `🎥 Cours en direct : ${link.title}\n⏰ ${link.time}\n🔗 ${link.url}`;
@@ -127,7 +119,6 @@ export default function Meet() {
                   <div className={`flex items-center gap-2 px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border ${plat.bg} ${plat.border}`} style={{ color: plat.color }}>{link.platform}</div>
                   <div className="flex gap-2">
                      <button onClick={() => handleShareWhatsApp(link)} className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-500 transition-all active:scale-90" title="WhatsApp"><MessageCircle size={18}/></button>
-                     <button onClick={() => handleShareEmail(link)} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-500 transition-all active:scale-90" title="Email"><Mail size={18}/></button>
                      {canManage && <button onClick={() => handleDelete(link.id)} className="p-3 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-500 transition-all active:scale-90"><Trash2 size={18}/></button>}
                   </div>
                </div>

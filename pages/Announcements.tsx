@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { API } from '../services/api';
 import { 
   Plus, Trash2, Loader2, Pencil, Megaphone, Search, Bookmark, Maximize2,
-  ExternalLink, MessageCircle, Mail, Link as LinkIcon, Copy, Share2, AlertCircle, X,
+  ExternalLink, MessageCircle, Link as LinkIcon, Copy, Share2, AlertCircle, X,
   Globe, Video, FileText, Link2, PlusCircle, CheckCircle2, ChevronRight, Hash, Type, Info, ClipboardCopy
 } from 'lucide-react';
 import { UserRole, Announcement, AnnouncementPriority, ExternalLink as ExtLinkType, ClassGroup } from '../types';
@@ -54,27 +54,9 @@ export default function Announcements() {
     return () => { sub.unsubscribe(); };
   }, [fetchAll]);
 
-  const validateField = (name: string, value: string) => {
-    let error = "";
-    if (name === 'title') {
-      if (value.trim().length < 5) error = "Titre trop court (min 5 car.)";
-    } else if (name === 'content') {
-      if (value.trim().length < 10) error = "Contenu trop court (min 10 car.)";
-    }
-    setErrors(prev => ({ ...prev, [name]: error }));
-  };
-
   const getWhatsAppTemplate = (ann: Announcement) => {
     const appUrl = window.location.origin + "/#/announcements";
     return `📢 *Information Importante – JANGHUP*\n\n🔔 *${ann.title}*\n📅 ${new Date(ann.date).toLocaleDateString()}\n📘 ${ann.content}\n\n👉 Consultez les détails ici :\n🔗 ${appUrl}\n\n— JANGHUP\nPlateforme académique officielle`;
-  };
-
-  const getEmailTemplate = (ann: Announcement) => {
-    const appUrl = window.location.origin + "/#/announcements";
-    return {
-      subject: `📢 [Annonce] ${ann.title} – JANGHUP`,
-      body: `Bonjour,\n\nNous vous informons qu'une nouvelle mise à jour est disponible sur la plateforme JANGHUP.\n\nDétails :\n\n📘 Objet : ${ann.title}\n📅 Date : ${new Date(ann.date).toLocaleDateString()}\n📝 Description : ${ann.content}\n\n🔗 Accéder à la plateforme :\n${appUrl}\n\nPour toute information complémentaire, veuillez consulter votre espace personnel.\n\nCordialement,\n\n— JANGHUP\nPlateforme académique officielle`
-    };
   };
 
   const handleCopyTemplate = (ann: Announcement) => {
@@ -85,12 +67,6 @@ export default function Announcements() {
 
   const handleShareWhatsApp = (ann: Announcement) => {
     API.sharing.whatsapp(getWhatsAppTemplate(ann));
-  };
-
-  const handleShareEmail = (ann: Announcement) => {
-    const { subject, body } = getEmailTemplate(ann);
-    const classObj = classes.find(c => c.name === ann.classname);
-    API.sharing.email(classObj?.email || '', subject, body);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -178,8 +154,7 @@ export default function Announcements() {
                 <button onClick={() => setViewingAnn(ann)} className="text-[10px] font-black uppercase text-brand flex items-center gap-2 tracking-widest hover:translate-x-1 transition-transform">Plein écran <Maximize2 size={14} /></button>
               </div>
               <div className="flex md:flex-col items-center justify-center gap-3 md:pl-10 md:border-l border-gray-100 dark:border-gray-800 shrink-0">
-                <button onClick={() => handleShareWhatsApp(ann)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm active:scale-90" title="WhatsApp"><MessageCircle size={20}/></button>
-                <button onClick={() => handleShareEmail(ann)} className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-500 hover:text-white transition-all shadow-sm active:scale-90" title="Email"><Mail size={20}/></button>
+                <button onClick={() => handleShareWhatsApp(ann)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all shadow-sm active:scale-90" title="Partager WhatsApp"><MessageCircle size={20}/></button>
                 <button onClick={() => handleCopyTemplate(ann)} className="p-4 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-900 hover:text-white transition-all shadow-sm active:scale-90" title="Copier le modèle"><ClipboardCopy size={20}/></button>
                 {canManage && (
                   <>

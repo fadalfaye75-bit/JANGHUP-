@@ -49,7 +49,7 @@ export default function AdminPanel() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
-  const [classFormData, setClassFormData] = useState({ id: '', name: '', email: '', color: '#0ea5e9' });
+  const [classFormData, setClassFormData] = useState({ id: '', name: '', color: '#0ea5e9' });
   const [isEditClassMode, setIsEditClassMode] = useState(false);
 
   const themeColor = user?.themecolor || '#87CEEB';
@@ -147,11 +147,10 @@ export default function AdminPanel() {
       if (isEditClassMode) {
         await API.classes.update(classFormData.id, { 
           name: classFormData.name, 
-          email: classFormData.email, 
           color: classFormData.color 
         });
       } else {
-        await API.classes.create(classFormData.name, classFormData.email, classFormData.color);
+        await API.classes.create(classFormData.name, classFormData.color);
       }
       addNotification({ title: 'Filière enregistrée', message: 'Les données ont été synchronisées.', type: 'success' });
       setIsClassModalOpen(false);
@@ -201,7 +200,7 @@ export default function AdminPanel() {
         dataToExport = users.map(u => ({ Nom: u.name, Email: u.email, Role: u.role, Filière: u.classname }));
         filename = "utilisateurs";
       } else if (type === 'classes') {
-        dataToExport = classesList.map(c => ({ Nom: c.name, Email: c.email, Effectif: c.studentCount }));
+        dataToExport = classesList.map(c => ({ Nom: c.name, Effectif: c.studentCount }));
         filename = "filieres";
       } else {
         dataToExport = logs.map(l => ({ Date: l.timestamp, Acteur: l.actor, Action: l.action, Cible: l.target }));
@@ -418,7 +417,7 @@ export default function AdminPanel() {
                           <CheckCircle2 size={14} className="text-brand" /> Gestion institutionnelle
                         </p>
                     </div>
-                    <button onClick={() => { setClassFormData({ id: '', name: '', email: '', color: '#0ea5e9' }); setIsEditClassMode(false); setIsClassModalOpen(true); }} className="bg-slate-900 dark:bg-black text-white px-10 py-5 rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-2xl active:scale-95 transition-all italic flex items-center gap-3 hover:bg-gray-800">
+                    <button onClick={() => { setClassFormData({ id: '', name: '', color: '#0ea5e9' }); setIsEditClassMode(false); setIsClassModalOpen(true); }} className="bg-slate-900 dark:bg-black text-white px-10 py-5 rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-2xl active:scale-95 transition-all italic flex items-center gap-3 hover:bg-gray-800">
                         <Plus size={20} /> Ajouter une Filière
                     </button>
                 </div>
@@ -438,11 +437,10 @@ export default function AdminPanel() {
                             </div>
                             
                             <h4 className="text-3xl font-black italic mb-2 text-gray-900 dark:text-white leading-tight tracking-tight uppercase">{cls.name}</h4>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-12 truncate italic">{cls.email || 'Aucun email de diffusion'}</p>
                             
                             <div className="mt-auto space-y-3 relative z-10">
                                 <div className="grid grid-cols-2 gap-3">
-                                  <button onClick={() => { setClassFormData({ id: cls.id, name: cls.name, email: cls.email || '', color: cls.color || '#0ea5e9' }); setIsEditClassMode(true); setIsClassModalOpen(true); }} className="py-4 bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-brand rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 font-black text-[9px] uppercase"><PenSquare size={16}/> Éditer</button>
+                                  <button onClick={() => { setClassFormData({ id: cls.id, name: cls.name, color: cls.color || '#0ea5e9' }); setIsEditClassMode(true); setIsClassModalOpen(true); }} className="py-4 bg-gray-50 dark:bg-gray-800 text-gray-400 hover:text-brand rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 font-black text-[9px] uppercase"><PenSquare size={16}/> Éditer</button>
                                   <button onClick={() => handleDeleteClass(cls.id, cls.name)} className="py-4 bg-red-50 dark:bg-red-900/10 text-red-400 hover:text-red-500 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 font-black text-[9px] uppercase"><Trash2 size={16}/> Retirer</button>
                                 </div>
                             </div>
@@ -565,10 +563,6 @@ export default function AdminPanel() {
             <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 italic">Nom de la classe</label>
                 <input required className="w-full p-5 rounded-[1.5rem] bg-gray-50 dark:bg-gray-800 border-none font-bold text-sm outline-none shadow-inner-soft focus:ring-4 focus:ring-brand-50" placeholder="L2 Informatique" value={classFormData.name} onChange={e => setClassFormData({...classFormData, name: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 italic">Email de diffusion</label>
-                <input type="email" className="w-full p-5 rounded-[1.5rem] bg-gray-50 dark:bg-gray-800 border-none font-bold text-sm outline-none shadow-inner-soft focus:ring-4 focus:ring-brand-50" placeholder="list-l2@esp.sn" value={classFormData.email} onChange={e => setClassFormData({...classFormData, email: e.target.value})} />
             </div>
             <div className="space-y-4">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 italic">Identité Visuelle</label>

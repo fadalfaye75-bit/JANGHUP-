@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { API } from '../services/api';
 import { 
   Clock, MapPin, Plus, Trash2, Loader2, Pencil, 
-  Calendar as CalendarIcon, Copy, Timer, FileText, MessageCircle, Mail, AlertTriangle, ClipboardCopy
+  Calendar as CalendarIcon, Copy, Timer, FileText, MessageCircle, AlertTriangle, ClipboardCopy
 } from 'lucide-react';
 import { UserRole, Exam, ClassGroup } from '../types';
 import Modal from '../components/Modal';
@@ -51,23 +51,8 @@ export default function Exams() {
     return `📢 *Information Importante – JANGHUP*\n\n🔔 *Examen : ${exam.subject}*\n📅 ${dateStr}\n📘 Salle : ${exam.room} | Durée : ${exam.duration}\n\n👉 Consultez les détails ici :\n🔗 ${window.location.origin}/#/exams\n\n— JANGHUP\nPlateforme académique officielle`;
   };
 
-  const getEmailTemplate = (exam: Exam) => {
-    const examDate = new Date(exam.date);
-    const dateStr = examDate.toLocaleDateString() + ' à ' + examDate.toTimeString().slice(0, 5);
-    return {
-      subject: `📢 [Examen] ${exam.subject} – JANGHUP`,
-      body: `Bonjour,\n\nNous vous informons qu’une nouvelle mise à jour concernant vos évaluations est disponible sur la plateforme JANGHUP.\n\nDétails :\n\n📘 Objet : Examen de ${exam.subject}\n📅 Date : ${dateStr}\n📝 Description : Salle ${exam.room} | Durée prévue : ${exam.duration}. ${exam.notes || ''}\n\n🔗 Accéder à la plateforme :\n${window.location.origin}/#/exams\n\nPour toute information complémentaire, veuillez consulter votre espace personnel.\n\nCordialement,\n\n— JANGHUP\nPlateforme académique officielle`
-    };
-  };
-
   const handleShareWhatsApp = (exam: Exam) => {
     API.sharing.whatsapp(getWhatsAppTemplate(exam));
-  };
-
-  const handleShareEmail = (exam: Exam) => {
-    const { subject, body } = getEmailTemplate(exam);
-    const classObj = classes.find(c => c.name === exam.classname);
-    API.sharing.email(classObj?.email || '', subject, body);
   };
 
   const handleCopyTemplate = (exam: Exam) => {
@@ -134,7 +119,6 @@ export default function Exams() {
               </div>
               <div className="flex flex-wrap md:flex-col gap-3 md:pl-10 md:border-l border-slate-100 dark:border-slate-800 self-stretch justify-center">
                 <button onClick={() => handleShareWhatsApp(exam)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all active:scale-90" title="Partager WhatsApp"><MessageCircle size={20}/></button>
-                <button onClick={() => handleShareEmail(exam)} className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl hover:bg-indigo-500 hover:text-white transition-all active:scale-90" title="Diffuser par Email"><Mail size={20}/></button>
                 <button onClick={() => handleCopyTemplate(exam)} className="p-4 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-900 hover:text-white transition-all active:scale-90" title="Copier le modèle"><ClipboardCopy size={20}/></button>
                 {canManage && (
                   <button onClick={async () => { if(confirm("Supprimer ?")) { await API.exams.delete(exam.id); fetchExams(); } }} className="p-4 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-sm active:scale-90"><Trash2 size={20}/></button>
