@@ -4,11 +4,9 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Megaphone, Calendar, GraduationCap, Video, 
   BarChart2, LogOut, Menu, Moon, Sun, 
-  ShieldCheck, Bell, School, 
-  BellRing, X
+  ShieldCheck, School, X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useNotification } from '../context/NotificationContext';
 import { UserRole } from '../types';
 
 export const UserAvatar = React.memo(({ name, color, className = "w-10 h-10", textClassName = "text-xs" }: { name: string, color?: string, className?: string, textClassName?: string }) => {
@@ -28,25 +26,13 @@ export const UserAvatar = React.memo(({ name, color, className = "w-10 h-10", te
 
 export default function Layout() {
   const { user, logout, toggleTheme, isDarkMode } = useAuth();
-  const { notifications, unreadCount, markAllAsRead, clearNotifications } = useNotification();
   const navigate = useNavigate();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
-  const [isNotifOpen, setNotifOpen] = useState(false);
   const location = useLocation();
-  const notifRef = useRef<HTMLDivElement>(null);
   const themeColor = user?.themecolor || '#87CEEB';
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) setNotifOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
     setSidebarOpen(false);
-    setNotifOpen(false);
   }, [location]);
 
   const navItems = useMemo(() => {
@@ -103,30 +89,6 @@ export default function Layout() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-             <div className="relative" ref={notifRef}>
-                <button onClick={() => { markAllAsRead(); setNotifOpen(!isNotifOpen); }} className="p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all relative">
-                  <Bell size={20} />
-                  {unreadCount > 0 && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white dark:border-slate-800"></span>}
-                </button>
-                {isNotifOpen && (
-                  <div className="absolute top-full right-0 mt-3 w-80 bg-white dark:bg-slate-900 rounded-3xl shadow-premium border border-slate-100 dark:border-slate-800 overflow-hidden animate-fade-in z-[100]">
-                    <div className="p-5 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center">
-                       <h4 className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-white">Centre d'Alertes</h4>
-                       <button onClick={clearNotifications} className="text-[9px] font-black text-rose-500 hover:underline uppercase">Vider</button>
-                    </div>
-                    <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
-                       {notifications.length > 0 ? notifications.map(n => (
-                         <div key={n.id} className="p-4 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <p className="text-[10px] font-black text-slate-900 dark:text-white mb-1 leading-tight">{n.title}</p>
-                            <p className="text-[9px] text-slate-400 font-medium line-clamp-2">{n.message}</p>
-                         </div>
-                       )) : (
-                         <div className="p-10 text-center opacity-30"><BellRing size={32} className="mx-auto mb-3" /><p className="text-[10px] font-black uppercase tracking-widest">Aucun signal</p></div>
-                       )}
-                    </div>
-                  </div>
-                )}
-             </div>
              <button onClick={toggleTheme} className="p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">
                 {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
              </button>

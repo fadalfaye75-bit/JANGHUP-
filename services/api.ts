@@ -46,7 +46,6 @@ export const API = {
       return data;
     },
 
-    // Added updatePassword to fix error in Profile.tsx
     updatePassword: async (id: string, pass: string) => {
       const { error } = await supabase.auth.updateUser({ password: pass });
       if (error) throw error;
@@ -73,7 +72,6 @@ export const API = {
         date: new Date().toISOString() 
       }]);
     },
-    // Added update to fix error in Announcements.tsx
     update: async (id: string, ann: any) => {
       return supabase.from('announcements').update(ann).eq('id', id);
     },
@@ -94,7 +92,6 @@ export const API = {
       const { data: { user } } = await supabase.auth.getUser();
       return supabase.from('exams').insert([{ ...exam, user_id: user?.id }]);
     },
-    // Added update to fix error in Exams.tsx
     update: async (id: string, exam: any) => {
       return supabase.from('exams').update(exam).eq('id', id);
     },
@@ -124,7 +121,6 @@ export const API = {
       if (pError) throw pError;
       return supabase.from('poll_options').insert(poll.options.map((o: any) => ({ poll_id: newPoll.id, label: o.label })));
     },
-    // Added update to fix error in Polls.tsx
     update: async (id: string, updates: any) => {
       return supabase.from('polls').update(updates).eq('id', id);
     },
@@ -145,7 +141,6 @@ export const API = {
       const { data: { user } } = await supabase.auth.getUser();
       return supabase.from('meet_links').insert([{ ...meet, user_id: user?.id }]);
     },
-    // Added update to fix error in Meet.tsx
     update: async (id: string, meet: any) => {
       return supabase.from('meet_links').update(meet).eq('id', id);
     },
@@ -159,7 +154,6 @@ export const API = {
       return data || [];
     },
     create: async (name: string, color: string) => supabase.from('classes').insert([{ name, color }]),
-    // Added update to fix error in AdminPanel.tsx
     update: async (id: string, updates: any) => {
       return supabase.from('classes').update(updates).eq('id', id);
     },
@@ -167,7 +161,6 @@ export const API = {
   },
 
   schedules: {
-    // Added list to fix error in Profile.tsx
     list: async (): Promise<ScheduleFile[]> => {
       const { data, error } = await supabase.from('schedule_files').select('*').order('created_at', { ascending: false });
       if (error) throw error;
@@ -197,12 +190,19 @@ export const API = {
 
   notifications: {
     list: async (): Promise<AppNotification[]> => {
-      const { data, error } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(20);
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase.from('profiles').select('classname').eq('id', user?.id).single();
+      
+      const { data, error } = await supabase.from('notifications')
+        .select('*')
+        .or(`target_user_id.eq.${user?.id},target_user_id.eq.system,classname.eq.${profile?.classname},classname.eq.Général`)
+        .order('timestamp', { ascending: false })
+        .limit(50);
+        
       if (error) throw error;
       return data || [];
     },
     markRead: async (id: string) => supabase.from('notifications').update({ is_read: true }).eq('id', id),
-    // Added markAllAsRead to fix error in NotificationContext.tsx
     markAllAsRead: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       return supabase.from('notifications').update({ is_read: true }).eq('target_user_id', user?.id).eq('is_read', false);
@@ -210,6 +210,14 @@ export const API = {
     clear: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       return supabase.from('notifications').delete().eq('target_user_id', user?.id);
+    },
+    delete: async (id: string) => supabase.from('notifications').delete().eq('id', id),
+    create: async (notif: Partial<AppNotification>) => {
+      return supabase.from('notifications').insert([{
+        ...notif,
+        timestamp: new Date().toISOString(),
+        is_read: false
+      }]);
     },
     subscribe: (callback: () => void) => {
       const sub = supabase.channel('notif_channel').on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, callback).subscribe();
@@ -233,7 +241,6 @@ export const API = {
     }
   },
 
-  // Added favorites to fix error in Profile.tsx
   favorites: {
     list: async (): Promise<any[]> => {
       const { data: { user } } = await supabase.auth.getUser();

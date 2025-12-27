@@ -3,16 +3,18 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API } from '../services/api';
-import { Announcement, Exam, UserRole, Poll, MeetLink } from '../types';
+import { Announcement, Exam, UserRole, Poll, MeetLink, AppNotification } from '../types';
 import { 
   GraduationCap, Loader2, BarChart2, 
   Calendar, Radio, Zap, ArrowRight, 
   Megaphone, Clock, Sparkles, ChevronRight,
-  School, Bell, MapPin
+  School, Bell, MapPin, AlertCircle, AlertTriangle
 } from 'lucide-react';
+import { useNotification } from '../context/NotificationContext';
 
 export default function Dashboard() {
   const { user, adminViewClass } = useAuth();
+  const { notifications } = useNotification();
   const navigate = useNavigate();
   const isMounted = useRef(true);
   const themeColor = user?.themecolor || '#87CEEB';
@@ -24,6 +26,10 @@ export default function Dashboard() {
     meets: [] as MeetLink[]
   });
   const [loading, setLoading] = useState(true);
+
+  const urgentNotifs = useMemo(() => {
+    return notifications.filter(n => n.priority === 'urgent' && !n.is_read).slice(0, 2);
+  }, [notifications]);
 
   const filterByAccess = useCallback((itemClass: string) => {
     const target = itemClass || 'Général';
@@ -82,6 +88,28 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-12 animate-fade-in pb-40 px-4 md:px-0">
+      
+      {/* Urgent Alerts Section */}
+      {urgentNotifs.length > 0 && (
+        <section className="space-y-4">
+           {urgentNotifs.map(n => (
+             <div key={n.id} onClick={() => navigate('/notifications')} className="bg-rose-500 text-white p-6 md:p-8 rounded-[2.5rem] shadow-premium flex flex-col md:flex-row items-center justify-between gap-6 animate-pulse cursor-pointer hover:scale-[1.01] transition-all">
+                <div className="flex items-center gap-6">
+                   <div className="p-4 bg-white/20 rounded-2xl"><AlertTriangle size={28} /></div>
+                   <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.3em] opacity-80 mb-1">Alerte Prioritaire</h4>
+                      <p className="text-xl font-black italic uppercase tracking-tighter">{n.title}</p>
+                   </div>
+                </div>
+                <div className="flex items-center gap-4">
+                   <span className="text-[10px] font-black uppercase tracking-widest bg-black/20 px-6 py-3 rounded-xl italic">Action Recommandée</span>
+                   <ChevronRight size={24}/>
+                </div>
+             </div>
+           ))}
+        </section>
+      )}
+
       {/* Hero Section */}
       <section className="bg-white dark:bg-slate-900 rounded-[4rem] p-8 md:p-16 shadow-premium border border-slate-50 dark:border-slate-800 relative overflow-hidden group">
          <div className="absolute top-0 right-0 w-[50rem] h-[50rem] bg-brand-50/40 dark:bg-brand-900/10 rounded-full -mr-48 -mt-48 blur-3xl pointer-events-none" />

@@ -39,6 +39,7 @@ const Polls = lazy(() => import('./pages/Polls.tsx'));
 const Schedule = lazy(() => import('./pages/Schedule.tsx'));
 const AdminPanel = lazy(() => import('./pages/AdminPanel.tsx'));
 const Profile = lazy(() => import('./pages/Profile.tsx'));
+const Notifications = lazy(() => import('./pages/Notifications.tsx'));
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -74,6 +75,7 @@ function AppRoutes() {
           <Route path="schedule" element={<Schedule />} />
           <Route path="profile" element={<Profile />} />
           <Route path="admin" element={<AdminPanel />} />
+          <Route path="notifications" element={<Notifications />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

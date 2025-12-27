@@ -108,6 +108,8 @@ export interface AppNotification {
   timestamp: string;
   is_read: boolean;
   target_user_id: string;
+  classname?: string;
+  priority?: 'low' | 'high' | 'urgent';
 }
 
 export interface ActivityLog {
@@ -129,7 +131,6 @@ export interface Grade {
   classname: string;
 }
 
-// Added ScheduleFile to fix missing export error in Profile.tsx
 export interface ScheduleFile {
   id: string;
   name: string;
