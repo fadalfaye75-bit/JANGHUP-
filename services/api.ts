@@ -71,11 +71,12 @@ export const API = {
     },
     create: async (ann: any) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase.from('profiles').select('name').eq('id', user?.id).single();
+      const { data: profile } = await supabase.from('profiles').select('name, email').eq('id', user?.id).single();
       const { error } = await supabase.from('announcements').insert([{ 
         ...ann, 
         user_id: user?.id, 
         author: profile?.name || 'Admin', 
+        email: profile?.email || '',
         date: new Date().toISOString() 
       }]);
       if (error) throw error;
@@ -124,7 +125,7 @@ export const API = {
     },
     vote: async (pollId: string, optionId: string) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error = null } = await supabase.from('poll_votes').upsert({ poll_id: pollId, user_id: user?.id, option_id: optionId }, { onConflict: 'poll_id,user_id' });
+      const { error } = await supabase.from('poll_votes').upsert({ poll_id: pollId, user_id: user?.id, option_id: optionId }, { onConflict: 'poll_id,user_id' });
       if (error) throw error;
     },
     create: async (poll: any) => {

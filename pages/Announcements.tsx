@@ -5,7 +5,7 @@ import { API } from '../services/api';
 import { 
   Plus, Trash2, Loader2, Pencil, Megaphone, Search, Bookmark, Maximize2,
   ExternalLink, MessageCircle, Link as LinkIcon, Copy, Share2, AlertCircle, X,
-  Globe, Video, FileText, Link2, PlusCircle, CheckCircle2, ChevronRight, Hash, Type, Info, ClipboardCopy
+  Globe, Video, FileText, Link2, PlusCircle, CheckCircle2, ChevronRight, Hash, Type, Info, ClipboardCopy, Mail
 } from 'lucide-react';
 import { UserRole, Announcement, AnnouncementPriority, ExternalLink as ExtLinkType, ClassGroup } from '../types';
 import Modal from '../components/Modal';
@@ -26,10 +26,9 @@ export default function Announcements() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newAnn, setNewAnn] = useState({ 
     title: '', content: '', priority: 'normal' as AnnouncementPriority, 
-    classname: 'Général', links: [] as ExtLinkType[] 
+    classname: 'Général', link: '', links: [] as ExtLinkType[] 
   });
   
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchAll = useCallback(async () => {
@@ -131,7 +130,7 @@ export default function Announcements() {
              <input type="text" placeholder="Filtrer..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-white dark:bg-slate-900 rounded-2xl text-[11px] font-bold outline-none border border-slate-100 dark:border-slate-800" />
           </div>
           {API.auth.canPost(user) && (
-            <button onClick={() => { setEditingId(null); setNewAnn({ title: '', content: '', priority: 'normal', classname: 'Général', links: [] }); setIsModalOpen(true); }} className="bg-slate-900 text-white px-8 py-4.5 rounded-[1.8rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-premium hover:brightness-110 active:scale-95 transition-all italic whitespace-nowrap"><Plus size={18} /> Publier</button>
+            <button onClick={() => { setEditingId(null); setNewAnn({ title: '', content: '', priority: 'normal', classname: 'Général', link: '', links: [] }); setIsModalOpen(true); }} className="bg-slate-900 text-white px-8 py-4.5 rounded-[1.8rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-premium hover:brightness-110 active:scale-95 transition-all italic whitespace-nowrap"><Plus size={18} /> Publier</button>
           )}
         </div>
       </div>
@@ -143,14 +142,30 @@ export default function Announcements() {
           const canManage = isAuthor || isAdmin;
           return (
             <div key={ann.id} className="group bg-white dark:bg-gray-900 rounded-[3.5rem] p-8 md:p-12 shadow-soft border-2 border-transparent hover:border-brand-100 transition-all flex flex-col md:flex-row gap-10 relative overflow-hidden">
-              <div className={`absolute top-0 left-0 w-2.5 h-full transition-all ${ann.priority === 'urgent' ? 'bg-rose-500 shadow-[2px_0_15px_rgba(244,63,94,0.3)]' : 'bg-brand'}`} />
+              <div className={`absolute top-0 left-0 w-2.5 h-full transition-all ${ann.priority === 'urgent' ? 'bg-rose-500 shadow-[2px_0_15_rgba(244,63,94,0.3)]' : 'bg-brand'}`} />
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-6">
                   <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-full text-white shadow-sm ${ann.priority === 'urgent' ? 'bg-rose-500 animate-pulse' : ann.priority === 'important' ? 'bg-amber-500' : 'bg-slate-900'}`}>{ann.priority}</span>
                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{ann.classname} • {new Date(ann.date).toLocaleDateString('fr-FR', {day: 'numeric', month: 'long', year: 'numeric'})}</span>
                 </div>
-                <h3 className="text-2xl font-black text-gray-900 dark:text-white italic tracking-tighter mb-5 uppercase leading-tight group-hover:text-brand transition-colors">{ann.title}</h3>
-                <p className="text-gray-600 dark:text-gray-300 italic text-sm line-clamp-3 leading-relaxed mb-6">{ann.content}</p>
+                <h3 className="text-2xl font-black text-gray-900 dark:text-white italic tracking-tighter mb-4 uppercase leading-tight group-hover:text-brand transition-colors">{ann.title}</h3>
+                
+                <div className="flex flex-wrap items-center gap-4 mb-5">
+                  {ann.email && (
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 italic">
+                      <Mail size={12} className="text-brand" />
+                      <span>{ann.email}</span>
+                    </div>
+                  )}
+                  {ann.link && (
+                    <a href={ann.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] font-bold text-brand italic hover:underline">
+                      <LinkIcon size={12} />
+                      <span>Voir le lien externe</span>
+                    </a>
+                  )}
+                </div>
+
+                <p className="text-gray-600 dark:text-gray-300 italic text-sm line-clamp-3 leading-relaxed mb-6 whitespace-pre-wrap">{ann.content}</p>
                 <button onClick={() => setViewingAnn(ann)} className="text-[10px] font-black uppercase text-brand flex items-center gap-2 tracking-widest hover:translate-x-1 transition-transform">Plein écran <Maximize2 size={14} /></button>
               </div>
               <div className="flex md:flex-col items-center justify-center gap-3 md:pl-10 md:border-l border-gray-100 dark:border-gray-800 shrink-0">
@@ -158,7 +173,7 @@ export default function Announcements() {
                 <button onClick={() => handleCopyTemplate(ann)} className="p-4 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-900 hover:text-white transition-all shadow-sm active:scale-90" title="Copier le modèle"><ClipboardCopy size={20}/></button>
                 {canManage && (
                   <>
-                    <button onClick={() => { setEditingId(ann.id); setNewAnn({ title: ann.title, content: ann.content, priority: ann.priority, classname: ann.classname, links: ann.links || [] }); setIsModalOpen(true); }} className="p-4 bg-blue-50 text-blue-500 rounded-2xl hover:bg-blue-500 hover:text-white transition-all shadow-sm active:scale-90" title="Modifier"><Pencil size={20}/></button>
+                    <button onClick={() => { setEditingId(ann.id); setNewAnn({ title: ann.title, content: ann.content, priority: ann.priority, classname: ann.classname, link: ann.link || '', links: ann.links || [] }); setIsModalOpen(true); }} className="p-4 bg-blue-50 text-blue-500 rounded-2xl hover:bg-blue-500 hover:text-white transition-all shadow-sm active:scale-90" title="Modifier"><Pencil size={20}/></button>
                     <button onClick={() => handleDelete(ann.id)} className="p-4 bg-rose-50 text-rose-500 rounded-2xl hover:bg-rose-500 hover:text-white transition-all shadow-sm active:scale-90" title="Supprimer"><Trash2 size={20}/></button>
                   </>
                 )}
@@ -169,19 +184,26 @@ export default function Announcements() {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Éditer l'annonce" : "Nouvelle Publication JANGHUP"}>
-        <form onSubmit={handleSave} className="space-y-8 py-2">
-          <div className="space-y-6">
+        <form onSubmit={handleSave} className="space-y-6 py-2">
+          <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-slate-400 italic">Titre de l'annonce</label>
-              <input required value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all focus:border-brand" />
+              <input required value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all focus:border-brand" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 italic">Lien externe (optionnel)</label>
+              <div className="relative">
+                <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input type="url" placeholder="https://..." value={newAnn.link} onChange={e => setNewAnn({...newAnn, link: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all focus:border-brand" />
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-slate-400 italic">Contenu détaillé</label>
-              <textarea required rows={5} value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all focus:border-brand" />
+              <textarea required rows={5} value={newAnn.content} onChange={e => setNewAnn({...newAnn, content: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all focus:border-brand" />
             </div>
           </div>
           <button type="submit" disabled={submitting} className="w-full py-5 text-white rounded-[2.5rem] font-black uppercase text-[11px] tracking-widest shadow-premium active:scale-95 transition-all italic" style={{ backgroundColor: themeColor }}>
-            {submitting ? <Loader2 className="animate-spin" size={20} /> : "Diffuser l'information"}
+            {submitting ? <Loader2 className="animate-spin" size={20} /> : (editingId ? "Mettre à jour l'information" : "Diffuser l'information")}
           </button>
         </form>
       </Modal>
@@ -190,8 +212,27 @@ export default function Announcements() {
         <Modal isOpen={!!viewingAnn} onClose={() => setViewingAnn(null)} title={viewingAnn.title}>
            <div className="space-y-8 italic">
               <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-lg whitespace-pre-wrap">{viewingAnn.content}</p>
-              <div className="pt-8 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                 <span>PAR {viewingAnn.author}</span>
+              
+              {viewingAnn.link && (
+                <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                   <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center text-brand shadow-sm">
+                         <LinkIcon size={24} />
+                      </div>
+                      <div>
+                         <p className="text-[10px] font-black uppercase text-slate-400">Ressource externe</p>
+                         <p className="text-xs font-bold truncate max-w-[150px] md:max-w-xs">{viewingAnn.link}</p>
+                      </div>
+                   </div>
+                   <a href={viewingAnn.link} target="_blank" rel="noopener noreferrer" className="bg-brand text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm hover:brightness-110 transition-all">Ouvrir</a>
+                </div>
+              )}
+
+              <div className="pt-8 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center text-[10px] font-black text-gray-400 uppercase tracking-widest gap-4">
+                 <div className="flex flex-col gap-1">
+                   <span>PAR {viewingAnn.author}</span>
+                   {viewingAnn.email && <span className="text-brand lowercase font-bold">{viewingAnn.email}</span>}
+                 </div>
                  <span>{new Date(viewingAnn.date).toLocaleDateString()}</span>
               </div>
            </div>

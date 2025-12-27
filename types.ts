@@ -31,6 +31,8 @@ export interface Announcement {
   title: string;
   content: string;
   author: string;
+  email?: string;
+  link?: string; // Nouveau champ lien direct
   date: string;
   classname: string;
   priority: AnnouncementPriority;
