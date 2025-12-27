@@ -14,7 +14,8 @@ import { UserAvatar } from '../components/Layout';
 export default function Messages() {
   const { user } = useAuth();
   const { addNotification } = useNotification();
-  const themeColor = user?.themeColor || '#0ea5e9';
+  // Fix: Property 'themeColor' does not exist on type 'User'. Did you mean 'themecolor'?
+  const themeColor = user?.themecolor || '#0ea5e9';
   
   const [contacts, setContacts] = useState<User[]>([]);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -124,10 +125,12 @@ export default function Messages() {
                 onClick={() => setSelectedContact(contact)}
                 className={`w-full p-4 rounded-2xl flex items-center gap-4 transition-all ${selectedContact?.id === contact.id ? 'bg-gray-900 text-white shadow-xl' : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
               >
-                <UserAvatar name={contact.name} color={contact.themeColor} className="w-10 h-10" />
+                {/* Fix: Property 'themeColor' does not exist on type 'User'. Did you mean 'themecolor'? */}
+                <UserAvatar name={contact.name} color={contact.themecolor} className="w-10 h-10" />
                 <div className="flex-1 text-left min-w-0">
                    <p className="text-sm font-black italic truncate leading-none mb-1">{contact.name}</p>
-                   <p className={`text-[8px] font-bold uppercase tracking-widest opacity-60`}>{contact.role} • {contact.className}</p>
+                   {/* Fix: Property 'className' does not exist on type 'User'. Did you mean 'classname'? */}
+                   <p className={`text-[8px] font-bold uppercase tracking-widest opacity-60`}>{contact.role} • {contact.classname}</p>
                 </div>
               </button>
             ))}
@@ -140,10 +143,12 @@ export default function Messages() {
             <>
               <div className="p-6 md:p-8 border-b border-gray-50 dark:border-gray-800 flex items-center justify-between bg-gray-50/20">
                  <div className="flex items-center gap-4">
-                    <UserAvatar name={selectedContact.name} color={selectedContact.themeColor} className="w-12 h-12" />
+                    {/* Fix: Property 'themeColor' does not exist on type 'User'. Did you mean 'themecolor'? */}
+                    <UserAvatar name={selectedContact.name} color={selectedContact.themecolor} className="w-12 h-12" />
                     <div>
                        <h3 className="text-xl font-black italic tracking-tighter text-gray-900 dark:text-white leading-none">{selectedContact.name}</h3>
-                       <p className="text-[9px] font-black text-primary-500 uppercase tracking-widest mt-1">{selectedContact.role} • {selectedContact.className}</p>
+                       {/* Fix: Property 'className' does not exist on type 'User'. Did you mean 'classname'? */}
+                       <p className="text-[9px] font-black text-primary-500 uppercase tracking-widest mt-1">{selectedContact.role} • {selectedContact.classname}</p>
                     </div>
                  </div>
                  <div className="flex gap-2">

@@ -10,11 +10,11 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
-  className: string;
+  classname: string;
   avatar?: string;
-  schoolName?: string;
-  isActive?: boolean;
-  themeColor?: string;
+  schoolname?: string;
+  is_active?: boolean;
+  themecolor?: string;
   created_at?: string;
 }
 
@@ -32,7 +32,7 @@ export interface Announcement {
   content: string;
   author: string;
   date: string;
-  className: string;
+  classname: string;
   priority: AnnouncementPriority;
   links?: ExternalLink[];
   color?: string;
@@ -46,7 +46,7 @@ export interface Exam {
   duration: string;
   room: string;
   notes?: string;
-  className: string;
+  classname: string;
   user_id?: string;
 }
 
@@ -59,11 +59,11 @@ export interface PollOption {
 export interface Poll {
   id: string;
   question: string;
-  className: string;
+  classname: string;
   options: PollOption[];
   totalVotes: number;
-  isActive: boolean;
-  endTime?: string | null;
+  isactive: boolean;
+  endtime?: string | null;
   user_id: string;
   hasVoted?: boolean;
   userVoteOptionId?: string | null;
@@ -75,7 +75,7 @@ export interface MeetLink {
   platform: string;
   url: string;
   time: string;
-  className: string;
+  classname: string;
   user_id: string;
 }
 
@@ -83,7 +83,7 @@ export interface ScheduleFile {
   id: string;
   uploaded_by: string;
   url: string;
-  className: string;
+  classname: string;
   name: string;
   created_at: string;
 }
@@ -91,13 +91,13 @@ export interface ScheduleFile {
 export interface ScheduleSlot {
   id?: string;
   day: number;
-  startTime: string;
-  endTime: string;
+  starttime: string;
+  endtime: string;
   subject: string;
   teacher: string;
   room: string;
   color: string;
-  className: string;
+  classname: string;
 }
 
 export interface ActivityLog {

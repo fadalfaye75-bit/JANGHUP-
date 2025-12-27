@@ -15,7 +15,7 @@ export default function Dashboard() {
   const { user, adminViewClass } = useAuth();
   const navigate = useNavigate();
   const isMounted = useRef(true);
-  const themeColor = user?.themeColor || '#87CEEB';
+  const themeColor = user?.themecolor || '#87CEEB';
 
   const [data, setData] = useState({
     anns: [] as Announcement[],
@@ -29,8 +29,8 @@ export default function Dashboard() {
     const target = itemClass || 'Général';
     if (user?.role === UserRole.ADMIN && !adminViewClass) return true;
     if (adminViewClass) return target === adminViewClass || target === 'Général';
-    return target === user?.className || target === 'Général';
-  }, [user?.role, user?.className, adminViewClass]);
+    return target === user?.classname || target === 'Général';
+  }, [user?.role, user?.classname, adminViewClass]);
 
   const fetchData = useCallback(async (quiet = false) => {
     if (!isMounted.current) return;
@@ -47,10 +47,10 @@ export default function Dashboard() {
       if (!isMounted.current) return;
 
       setData({
-        anns: anns.filter(a => filterByAccess(a.className)).slice(0, 3),
-        exams: exams.filter(e => filterByAccess(e.className) && new Date(e.date) >= new Date()).slice(0, 2),
-        polls: polls.filter(p => filterByAccess(p.className) && p.isActive).slice(0, 1),
-        meets: meets.filter(m => filterByAccess(m.className)).slice(0, 1)
+        anns: anns.filter(a => filterByAccess(a.classname)).slice(0, 3),
+        exams: exams.filter(e => filterByAccess(e.classname) && new Date(e.date) >= new Date()).slice(0, 2),
+        polls: polls.filter(p => filterByAccess(p.classname) && p.isactive).slice(0, 1),
+        meets: meets.filter(m => filterByAccess(m.classname)).slice(0, 1)
       });
     } catch (error) {
       console.warn("[Dashboard] Sync issue");
@@ -92,7 +92,7 @@ export default function Dashboard() {
                </div>
                <h1 className="text-4xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase leading-[0.9] flex flex-col">
                   <span>Bonjour,</span>
-                  <span className="text-brand">{user.name.split(' ')[0]} 👋</span>
+                  <span className="text-brand">{user?.name.split(' ')[0]} 👋</span>
                </h1>
                <p className="text-slate-500 dark:text-slate-400 font-medium italic max-w-lg leading-relaxed text-sm md:text-base">
                   Bienvenue sur votre plateforme académique centralisée. Tous vos outils universitaires sont synchronisés.
@@ -113,8 +113,8 @@ export default function Dashboard() {
                     </div>
                 </div>
                 <div className="mt-6 text-center">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">{user.schoolName || 'ESP Dakar'}</p>
-                    <p className="text-xs font-bold text-slate-900 dark:text-white mt-1 uppercase tracking-tight italic">{user.className}</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">{user?.schoolname || 'ESP Dakar'}</p>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white mt-1 uppercase tracking-tight italic">{user?.classname}</p>
                 </div>
             </div>
          </div>
@@ -192,7 +192,6 @@ export default function Dashboard() {
                       {new Date(data.exams[0].date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
                    </div>
                    <div className="pt-2 flex items-center justify-between text-[10px] font-black uppercase tracking-widest opacity-60 italic border-t border-white/5 mt-6">
-                      {/* Fix: Added MapPin from lucide-react */}
                       <div className="flex items-center gap-2"><MapPin size={12}/> {data.exams[0].room}</div>
                       <div className="flex items-center gap-2"><Clock size={12}/> {data.exams[0].duration}</div>
                    </div>

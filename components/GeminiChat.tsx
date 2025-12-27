@@ -39,9 +39,8 @@ export default function GeminiChat() {
     setInput('');
     setIsLoading(true);
 
-    const context = `L'utilisateur est un ${user?.role} dans la classe ${user?.className}. Son nom est ${user?.name}.`;
+    const context = `L'utilisateur est un ${user?.role} dans la classe ${user?.classname}. Son nom est ${user?.name}.`;
     
-    // Initialiser le message du modèle vide
     setMessages(prev => [...prev, { role: 'model', text: '' }]);
     
     let fullResponse = "";
@@ -94,7 +93,6 @@ export default function GeminiChat() {
   return (
     <div className="fixed bottom-20 md:bottom-8 right-6 w-80 md:w-96 h-[550px] bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl flex flex-col z-40 border border-gray-100 dark:border-gray-700 animate-in slide-in-from-bottom-10 fade-in duration-300 overflow-hidden">
       
-      {/* Header */}
       <div className="flex items-center justify-between p-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md">
@@ -119,7 +117,6 @@ export default function GeminiChat() {
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50 dark:bg-gray-900/50 custom-scrollbar">
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
@@ -142,7 +139,6 @@ export default function GeminiChat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
       <form onSubmit={handleSend} className="p-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
         <div className="flex gap-2">
           <input

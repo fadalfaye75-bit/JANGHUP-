@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { User, Announcement, UserRole, ClassGroup, Exam, Poll, MeetLink, ScheduleSlot, ActivityLog, AppNotification, ScheduleFile, Grade, DirectMessage } from '../types';
 
@@ -53,9 +54,9 @@ export const API = {
         name: userData.name,
         email: userData.email,
         role: userData.role,
-        className: userData.className,
-        schoolName: userData.schoolName || 'ESP Dakar',
-        themeColor: '#87CEEB'
+        classname: userData.classname,
+        schoolname: userData.schoolname || 'ESP Dakar',
+        themecolor: '#87CEEB'
       }]).select().single();
       if (error) throw error;
       return data;
@@ -71,7 +72,12 @@ export const API = {
     create: async (ann: any) => {
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase.from('profiles').select('name').eq('id', user?.id).single();
-      const { error } = await supabase.from('announcements').insert([{ ...ann, user_id: user?.id, author: profile?.name || 'Admin', date: new Date().toISOString() }]);
+      const { error } = await supabase.from('announcements').insert([{ 
+        ...ann, 
+        user_id: user?.id, 
+        author: profile?.name || 'Admin', 
+        date: new Date().toISOString() 
+      }]);
       if (error) throw error;
     },
     update: async (id: string, updates: any) => {
@@ -123,7 +129,7 @@ export const API = {
     },
     create: async (poll: any) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: newPoll, error: pError } = await supabase.from('polls').insert([{ question: poll.question, className: poll.className, isActive: true, user_id: user?.id }]).select().single();
+      const { data: newPoll, error: pError } = await supabase.from('polls').insert([{ question: poll.question, classname: poll.classname, isactive: true, user_id: user?.id }]).select().single();
       if (pError) throw pError;
       const { error: oError } = await supabase.from('poll_options').insert(poll.options.map((o: any) => ({ poll_id: newPoll.id, label: o.label })));
       if (oError) throw oError;
@@ -178,42 +184,61 @@ export const API = {
   },
 
   schedules: {
-    list: async (className?: string): Promise<ScheduleFile[]> => {
+    list: async (classname?: string): Promise<ScheduleFile[]> => {
       let query = supabase.from('schedule_files').select('*').order('created_at', { ascending: false });
-      if (className) query = query.eq('className', className);
+      if (classname) query = query.eq('classname', classname);
       const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
-    getSlots: async (className: string): Promise<ScheduleSlot[]> => {
-      const { data, error } = await supabase.from('schedule_slots').select('*').eq('className', className);
+    getSlots: async (classname: string): Promise<ScheduleSlot[]> => {
+      const { data, error } = await supabase.from('schedule_slots').select('*').eq('classname', classname);
       if (error) throw error;
       return data || [];
     },
-    saveSlots: async (className: string, slots: ScheduleSlot[]) => {
-      const { error: delError } = await supabase.from('schedule_slots').delete().eq('className', className);
+    saveSlots: async (classname: string, slots: ScheduleSlot[]) => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("Authentification requise");
+
+      const { data: profile } = await supabase.from('profiles').select('role, classname').eq('id', authUser.id).single();
+      if (!profile) throw new Error("Profil introuvable");
+
+      if (profile.role !== UserRole.ADMIN && (profile.role !== UserRole.DELEGATE || profile.classname !== classname)) {
+        throw new Error("Vous n'avez pas les permissions pour modifier cette classe");
+      }
+
+      const { error: delError } = await supabase.from('schedule_slots').delete().eq('classname', classname);
       if (delError) throw delError;
       
       if (slots.length > 0) {
         const { error: insError } = await supabase.from('schedule_slots').insert(
           slots.map(s => ({
             day: s.day,
-            startTime: s.startTime,
-            endTime: s.endTime,
+            starttime: s.starttime,
+            endtime: s.endtime,
             subject: s.subject,
             teacher: s.teacher,
             room: s.room,
             color: s.color,
-            className: className
+            classname: classname
           }))
         );
         if (insError) throw insError;
       }
     },
-    uploadFile: async (file: File, className: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
+    uploadFile: async (file: File, classname: string) => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("Authentification requise");
+
+      const { data: profile } = await supabase.from('profiles').select('role, classname').eq('id', authUser.id).single();
+      if (!profile) throw new Error("Profil introuvable");
+
+      if (profile.role !== UserRole.ADMIN && (profile.role !== UserRole.DELEGATE || profile.classname !== classname)) {
+        throw new Error("Vous ne pouvez téléverser des documents que pour votre propre classe");
+      }
+
       const fileExt = file.name.split('.').pop();
-      const fileName = `schedule_${className.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.${fileExt}`;
+      const fileName = `schedule_${classname.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}.${fileExt}`;
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('schedules')
@@ -228,13 +253,25 @@ export const API = {
       const { error: dbError } = await supabase.from('schedule_files').insert([{
         name: file.name,
         url: publicUrl,
-        className: className,
-        uploaded_by: user?.id
+        classname: classname,
+        uploaded_by: authUser.id
       }]);
 
       if (dbError) throw dbError;
     },
     deleteFile: async (id: string) => {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error("Authentification requise");
+
+      const { data: profile } = await supabase.from('profiles').select('role, classname').eq('id', authUser.id).single();
+      const { data: fileData } = await supabase.from('schedule_files').select('classname').eq('id', id).single();
+      
+      if (!profile || !fileData) throw new Error("Action impossible ou fichier introuvable");
+
+      if (profile.role !== UserRole.ADMIN && (profile.role !== UserRole.DELEGATE || profile.classname !== fileData.classname)) {
+        throw new Error("Permissions insuffisantes pour supprimer ce document");
+      }
+
       const { error } = await supabase.from('schedule_files').delete().eq('id', id);
       if (error) throw error;
     }
@@ -334,7 +371,7 @@ export const API = {
   settings: {
     getAI: async () => {
       const { data, error } = await supabase.from('ai_settings').select('*').single();
-      if (error) return { isActive: true, verbosity: 'balanced', tone: 'helpful' };
+      if (error) return { isactive: true, verbosity: 'balanced', tone: 'helpful' };
       return data;
     }
   }

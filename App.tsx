@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, ReactNode } from 'react';
+import React, { Component, lazy, Suspense, useEffect, ReactNode } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { NotificationProvider } from './context/NotificationContext.tsx';
@@ -7,16 +7,19 @@ import { Loader2, AlertCircle, RefreshCcw } from 'lucide-react';
 interface ErrorBoundaryProps { children?: ReactNode; }
 interface ErrorBoundaryState { hasError: boolean; }
 
-// Fix: Using a constructor to initialize state and ensure this.props is properly typed from the base class.
-class RootErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Extending React Component with explicit props and state types.
+class RootErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // Fix: Declare state property in class body to resolve property existence errors.
+  state: ErrorBoundaryState = { hasError: false };
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false };
   }
 
   static getDerivedStateFromError() { return { hasError: true }; }
 
   render() {
+    // Fix: Accessing this.state.hasError which is now correctly recognized via class property definition.
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 p-6 text-center">
@@ -29,7 +32,7 @@ class RootErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundar
         </div>
       );
     }
-    // Using this.props.children is standard for React class components.
+    // Fix: Accessing this.props.children which is now correctly recognized through standard Component inheritance.
     return this.props.children;
   }
 }

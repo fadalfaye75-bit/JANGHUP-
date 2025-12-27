@@ -27,7 +27,7 @@ export default function Profile() {
   const [infoLoading, setInfoLoading] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
   
-  const [personalInfo, setPersonalInfo] = useState({ name: '', schoolName: '', themeColor: '#0ea5e9' });
+  const [personalInfo, setPersonalInfo] = useState({ name: '', schoolname: '', themecolor: '#0ea5e9' });
   const [passwords, setPasswords] = useState({ newPassword: '', confirmPassword: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -42,12 +42,12 @@ export default function Profile() {
     if (user) {
       setPersonalInfo({ 
         name: user.name, 
-        schoolName: user.schoolName || 'ESP Dakar',
-        themeColor: user.themeColor || '#0ea5e9'
+        schoolname: user.schoolname || 'ESP Dakar',
+        themecolor: user.themecolor || '#0ea5e9'
       });
       
       API.classes.list().then(list => {
-        const found = list.find(c => c.name === user.className);
+        const found = list.find(c => c.name === user.classname);
         if (found) setUserClass(found);
       });
     }
@@ -56,12 +56,10 @@ export default function Profile() {
   const fetchFavorites = useCallback(async () => {
     setFavLoading(true);
     try {
-      // Fix: Corrected API access for favorites
       const favs = await API.favorites.list();
       const annIds = favs.filter(f => f.content_type === 'announcement').map(f => f.content_id);
       const schIds = favs.filter(f => f.content_type === 'schedule').map(f => f.content_id);
 
-      // Fix: Corrected API signature and methods
       const [allAnns, allSchs] = await Promise.all([
         API.announcements.list(1000),
         API.schedules.list()
@@ -90,8 +88,8 @@ export default function Profile() {
     try {
       await updateCurrentUser({ 
         name: personalInfo.name, 
-        schoolName: personalInfo.schoolName,
-        themeColor: personalInfo.themeColor
+        schoolname: personalInfo.schoolname,
+        themecolor: personalInfo.themecolor
       });
       addNotification({ title: 'Succès', message: 'Profil mis à jour.', type: 'success' });
     } catch (error) {
@@ -109,7 +107,6 @@ export default function Profile() {
 
   const handleRemoveFavorite = async (id: string, type: 'announcement' | 'schedule') => {
     try {
-      // Fix: Corrected API access for favorites toggle
       await API.favorites.toggle(id, type);
       if (type === 'announcement') {
         setFavoriteItems(prev => ({ ...prev, announcements: prev.announcements.filter(a => a.id !== id) }));
@@ -143,7 +140,6 @@ export default function Profile() {
     
     setLoadingPass(true);
     try {
-      // Fix: Corrected API access for updating password
       if(user) await API.auth.updatePassword(user.id, passwords.newPassword);
       addNotification({ title: 'Sécurisé', message: 'Votre mot de passe a été modifié avec succès.', type: 'success' });
       setPasswords({ newPassword: '', confirmPassword: '' });
@@ -183,11 +179,11 @@ export default function Profile() {
         <div className="grid lg:grid-cols-3 gap-10">
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-white dark:bg-gray-900 rounded-[3.5rem] shadow-soft border border-gray-100 dark:border-gray-800 p-10 flex flex-col items-center text-center relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-full h-32 opacity-20 transition-all duration-1000 group-hover:h-40" style={{ backgroundColor: personalInfo.themeColor }}></div>
+              <div className="absolute top-0 left-0 w-full h-32 opacity-20 transition-all duration-1000 group-hover:h-40" style={{ backgroundColor: personalInfo.themecolor }}></div>
               <div className="relative z-10 mb-8 transform group-hover:scale-105 transition-transform duration-500">
                   <div 
                     className="w-36 h-36 rounded-[3rem] flex items-center justify-center text-5xl font-black text-white shadow-2xl border-4 border-white dark:border-gray-900"
-                    style={{ backgroundColor: personalInfo.themeColor }}
+                    style={{ backgroundColor: personalInfo.themecolor }}
                   >
                     {user?.name.charAt(0)}
                   </div>
@@ -198,17 +194,17 @@ export default function Profile() {
 
             <div className="bg-white dark:bg-gray-900 rounded-[3rem] shadow-soft border border-gray-100 dark:border-gray-800 p-8 space-y-6">
               <div className="flex items-center gap-5 text-gray-600 dark:text-gray-400">
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl shadow-sm" style={{ color: personalInfo.themeColor }}><Mail size={20} /></div>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl shadow-sm" style={{ color: personalInfo.themecolor }}><Mail size={20} /></div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-0.5">Contact</p>
                     <p className="truncate font-bold italic text-sm">{user?.email}</p>
                   </div>
               </div>
               <div className="flex items-center gap-5 text-gray-600 dark:text-gray-400">
-                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl shadow-sm" style={{ color: personalInfo.themeColor }}><GraduationCap size={20} /></div>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-2xl shadow-sm" style={{ color: personalInfo.themecolor }}><GraduationCap size={20} /></div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-0.5">Section</p>
-                    <p className="font-bold italic text-sm truncate">{user?.className}</p>
+                    <p className="font-bold italic text-sm truncate">{user?.classname}</p>
                   </div>
               </div>
             </div>
@@ -227,7 +223,7 @@ export default function Profile() {
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-white dark:bg-gray-900 rounded-[3.5rem] shadow-soft border border-gray-100 dark:border-gray-800 p-10">
               <h3 className="text-xl font-black text-gray-900 dark:text-white mb-6 uppercase tracking-widest flex items-center gap-3 italic">
-                <Palette size={24} style={{ color: personalInfo.themeColor }} /> Thème & Identité Visuelle
+                <Palette size={24} style={{ color: personalInfo.themecolor }} /> Thème & Identité Visuelle
               </h3>
               
               <div className="mb-10 space-y-6">
@@ -237,11 +233,11 @@ export default function Profile() {
                     {THEME_COLORS.map((t) => (
                       <button
                         key={t.color}
-                        onClick={() => setPersonalInfo({...personalInfo, themeColor: t.color})}
-                        className={`relative h-12 rounded-xl transition-all flex items-center justify-center group ${personalInfo.themeColor === t.color ? 'ring-4 ring-offset-4 ring-gray-100 scale-110 shadow-lg' : 'hover:scale-105 shadow-sm'}`}
+                        onClick={() => setPersonalInfo({...personalInfo, themecolor: t.color})}
+                        className={`relative h-12 rounded-xl transition-all flex items-center justify-center group ${personalInfo.themecolor === t.color ? 'ring-4 ring-offset-4 ring-gray-100 scale-110 shadow-lg' : 'hover:scale-105 shadow-sm'}`}
                         style={{ backgroundColor: t.color }}
                       >
-                        {personalInfo.themeColor === t.color && <Check size={20} className="text-white" />}
+                        {personalInfo.themecolor === t.color && <Check size={20} className="text-white" />}
                       </button>
                     ))}
                   </div>
@@ -258,7 +254,7 @@ export default function Profile() {
                      </div>
                      <button 
                         type="button" 
-                        onClick={() => setPersonalInfo({...personalInfo, themeColor: userClass.color!})}
+                        onClick={() => setPersonalInfo({...personalInfo, themecolor: userClass.color!})}
                         className="px-6 py-3 bg-white dark:bg-gray-700 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-sm border border-gray-100 dark:border-gray-600 hover:bg-gray-900 hover:text-white transition-all active:scale-95"
                      >
                        Appliquer
@@ -275,14 +271,14 @@ export default function Profile() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Établissement</label>
-                      <input value={personalInfo.schoolName} onChange={e => setPersonalInfo({...personalInfo, schoolName: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-800 font-bold italic text-sm outline-none border-none focus:ring-4 focus:ring-primary-50 transition-all" />
+                      <input value={personalInfo.schoolname} onChange={e => setPersonalInfo({...personalInfo, schoolname: e.target.value})} className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-gray-800 font-bold italic text-sm outline-none border-none focus:ring-4 focus:ring-primary-50 transition-all" />
                     </div>
                   </div>
                   <button 
                     type="submit" 
                     disabled={infoLoading} 
                     className="w-full sm:w-auto text-white px-12 py-5 rounded-[2rem] font-black shadow-2xl flex items-center justify-center gap-3 uppercase tracking-widest italic text-xs active:scale-95 transition-all hover:brightness-110"
-                    style={{ backgroundColor: personalInfo.themeColor, boxShadow: `0 15px 30px -5px ${personalInfo.themeColor}55` }}
+                    style={{ backgroundColor: personalInfo.themecolor, boxShadow: `0 15px 30px -5px ${personalInfo.themecolor}55` }}
                   >
                     {infoLoading ? <Loader2 className="animate-spin" /> : <Save size={20} />} Enregistrer le profil
                   </button>
@@ -291,7 +287,7 @@ export default function Profile() {
 
             <div className="bg-white dark:bg-gray-900 rounded-[3.5rem] shadow-soft border border-gray-100 dark:border-gray-800 p-10">
               <h3 className="text-xl font-black text-gray-900 dark:text-white mb-10 uppercase tracking-widest flex items-center gap-3 italic">
-                <Shield size={24} style={{ color: personalInfo.themeColor }} /> Accès & Sécurité
+                <Shield size={24} style={{ color: personalInfo.themecolor }} /> Accès & Sécurité
               </h3>
               <form onSubmit={handlePasswordChange} className="space-y-8">
                   <div className="grid sm:grid-cols-2 gap-6">
@@ -333,7 +329,7 @@ export default function Profile() {
                <section className="space-y-8">
                  <div className="flex items-center justify-between px-6">
                     <h3 className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-[0.4em] flex items-center gap-4 italic">
-                        <Megaphone size={18} style={{ color: personalInfo.themeColor }} /> Actualités Épinglées
+                        <Megaphone size={18} style={{ color: personalInfo.themecolor }} /> Actualités Épinglées
                     </h3>
                     <span className="text-[10px] font-black px-4 py-1.5 bg-amber-50 text-amber-600 rounded-full uppercase tracking-widest shadow-sm">{favoriteItems.announcements.length} ARCHIVÉS</span>
                  </div>
@@ -366,7 +362,7 @@ export default function Profile() {
                <section className="space-y-8">
                  <div className="flex items-center justify-between px-6">
                     <h3 className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-[0.4em] flex items-center gap-4 italic">
-                        <FileText size={18} style={{ color: personalInfo.themeColor }} /> Ressources & Documents
+                        <FileText size={18} style={{ color: personalInfo.themecolor }} /> Ressources & Documents
                     </h3>
                     <span className="text-[10px] font-black px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-full uppercase tracking-widest shadow-sm">{favoriteItems.schedules.length} DOCUMENTS</span>
                  </div>
@@ -379,10 +375,8 @@ export default function Profile() {
                           <FileText size={32} />
                         </div>
                         <div className="flex-1 min-w-0">
-                           {/* Fix: Property 'category' and 'version' do not exist on type 'ScheduleFile'. Use 'name' instead. */}
                            <h4 className="text-xl font-black italic text-gray-900 dark:text-white truncate group-hover:text-emerald-600 transition-colors">{sch.name}</h4>
-                           {/* Fix: Property 'uploadDate' does not exist on type 'ScheduleFile'. Use 'created_at' instead. */}
-                           <p className="text-[10px] font-bold text-gray-400 uppercase mt-2 tracking-[0.2em]">{sch.className || 'ESP Global'} • MIS À JOUR LE {new Date(sch.created_at).toLocaleDateString()}</p>
+                           <p className="text-[10px] font-bold text-gray-400 uppercase mt-2 tracking-[0.2em]">{sch.classname || 'ESP Global'} • MIS À JOUR LE {new Date(sch.created_at).toLocaleDateString()}</p>
                         </div>
                         <div className="flex gap-3 relative z-10">
                            <a href={sch.url} target="_blank" rel="noreferrer" className="p-4 text-emerald-500 hover:text-white hover:bg-emerald-500 bg-emerald-50 dark:bg-red-900/10 rounded-2xl transition-all shadow-sm active:scale-90"><ExternalLink size={20}/></a>

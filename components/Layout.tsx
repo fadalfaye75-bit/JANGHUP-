@@ -41,7 +41,7 @@ export default function Layout() {
   const location = useLocation();
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const themeColor = user?.themeColor || '#87CEEB';
+  const themeColor = user?.themecolor || '#87CEEB';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -135,7 +135,7 @@ export default function Layout() {
             </button>
             <div className="hidden sm:block">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 italic">Portail JangHup • ESP</p>
-              <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-none mt-1">{user.className}</h2>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-none mt-1">{user?.classname}</h2>
             </div>
           </div>
 
@@ -184,7 +184,6 @@ export default function Layout() {
            </div>
         </main>
 
-        {/* Mobile Bottom Navigation */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 glass border-t border-slate-100 dark:border-slate-800 z-50 flex items-center justify-around px-4">
            {navItems.slice(0, 5).map((item) => (
               <NavLink 

@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { API } from '../services/api';
@@ -45,14 +45,14 @@ export default function AdminPanel() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
-  const [newUser, setNewUser] = useState({ fullName: '', email: '', password: 'passer25', role: UserRole.STUDENT, className: '', schoolName: 'ESP Dakar' });
+  const [newUser, setNewUser] = useState({ fullName: '', email: '', password: 'passer25', role: UserRole.STUDENT, classname: '', schoolname: 'ESP Dakar' });
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   const [isClassModalOpen, setIsClassModalOpen] = useState(false);
   const [classFormData, setClassFormData] = useState({ id: '', name: '', email: '', color: '#0ea5e9' });
   const [isEditClassMode, setIsEditClassMode] = useState(false);
 
-  const themeColor = user?.themeColor || '#87CEEB';
+  const themeColor = user?.themecolor || '#87CEEB';
 
   const fetchGlobalData = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -68,11 +68,7 @@ export default function AdminPanel() {
         setClassesList(classesData);
         setLogs(logsData);
     } catch(e: any) {
-        if (e.message?.includes("recursion")) {
-            addNotification({ title: 'Erreur RLS', message: "Récursion infinie détectée dans vos politiques Supabase.", type: 'alert' });
-        } else {
-            addNotification({ title: 'Erreur Sync', message: e?.message || "Échec du chargement backend.", type: 'alert' });
-        }
+        addNotification({ title: 'Erreur Sync', message: e?.message || "Échec du chargement backend.", type: 'alert' });
     } finally {
         setLoading(false);
         setRefreshing(false);
@@ -87,7 +83,7 @@ export default function AdminPanel() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUser.fullName || !newUser.email || !newUser.className) {
+    if (!newUser.fullName || !newUser.email || !newUser.classname) {
       addNotification({ title: 'Champs requis', message: 'Veuillez remplir toutes les informations.', type: 'warning' });
       return;
     }
@@ -98,12 +94,12 @@ export default function AdminPanel() {
         name: newUser.fullName,
         email: newUser.email,
         role: newUser.role,
-        className: newUser.className,
-        schoolName: newUser.schoolName
+        classname: newUser.classname,
+        schoolname: newUser.schoolname
       });
       addNotification({ title: 'Profil Créé', message: 'Le compte a été ajouté à la base de données.', type: 'success' });
       setIsUserModalOpen(false);
-      setNewUser({ fullName: '', email: '', password: 'passer25', role: UserRole.STUDENT, className: '', schoolName: 'ESP Dakar' });
+      setNewUser({ fullName: '', email: '', password: 'passer25', role: UserRole.STUDENT, classname: '', schoolname: 'ESP Dakar' });
       fetchGlobalData(true);
     } catch (err: any) {
       addNotification({ title: 'Échec de création', message: err.message || "Erreur lors de la création.", type: 'alert' });
@@ -121,7 +117,7 @@ export default function AdminPanel() {
         name: editingUser.name,
         email: editingUser.email,
         role: editingUser.role,
-        className: editingUser.className
+        classname: editingUser.classname
       });
       addNotification({ title: 'Succès', message: 'Profil mis à jour.', type: 'success' });
       setIsEditModalOpen(false);
@@ -202,7 +198,7 @@ export default function AdminPanel() {
       let dataToExport: any[] = [];
       let filename = "";
       if (type === 'users') {
-        dataToExport = users.map(u => ({ Nom: u.name, Email: u.email, Role: u.role, Filière: u.className }));
+        dataToExport = users.map(u => ({ Nom: u.name, Email: u.email, Role: u.role, Filière: u.classname }));
         filename = "utilisateurs";
       } else if (type === 'classes') {
         dataToExport = classesList.map(c => ({ Nom: c.name, Email: c.email, Effectif: c.studentCount }));
@@ -393,7 +389,7 @@ export default function AdminPanel() {
                                                    <span className={`text-[8px] font-black px-2 py-0.5 rounded-md ${u.role === UserRole.ADMIN ? 'bg-violet-100 text-violet-600' : u.role === UserRole.DELEGATE ? 'bg-emerald-100 text-emerald-600' : 'bg-brand-100 text-brand-600'}`}>
                                                      {u.role}
                                                    </span>
-                                                   <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{u.className}</span>
+                                                   <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{u.classname}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -490,7 +486,6 @@ export default function AdminPanel() {
          )}
       </div>
 
-      {/* Modals de Gestion */}
       <Modal isOpen={isUserModalOpen} onClose={() => setIsUserModalOpen(false)} title="Enrôlement JangHup Premium">
           <form onSubmit={handleCreateUser} className="space-y-8 py-2">
               <div className="space-y-2">
@@ -512,7 +507,7 @@ export default function AdminPanel() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 italic">Filière</label>
-                    <select required className="w-full p-5 rounded-[1.5rem] bg-gray-50 dark:bg-gray-800 border-none font-black text-[10px] uppercase outline-none cursor-pointer" value={newUser.className} onChange={e => setNewUser({...newUser, className: e.target.value})}>
+                    <select required className="w-full p-5 rounded-[1.5rem] bg-gray-50 dark:bg-gray-800 border-none font-black text-[10px] uppercase outline-none cursor-pointer" value={newUser.classname} onChange={e => setNewUser({...newUser, classname: e.target.value})}>
                         <option value="">Sélectionner...</option>
                         {classesList.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                     </select>
@@ -552,7 +547,7 @@ export default function AdminPanel() {
                     </div>
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 italic">Filière</label>
-                        <select className="w-full p-5 rounded-2xl bg-gray-50 dark:bg-gray-800 border-none font-black text-[10px] uppercase outline-none" value={editingUser.className} onChange={e => setEditingUser({...editingUser, className: e.target.value})}>
+                        <select className="w-full p-5 rounded-2xl bg-gray-50 dark:bg-gray-800 border-none font-black text-[10px] uppercase outline-none" value={editingUser.classname} onChange={e => setEditingUser({...editingUser, classname: e.target.value})}>
                             <option value="">Aucune</option>
                             {classesList.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                         </select>

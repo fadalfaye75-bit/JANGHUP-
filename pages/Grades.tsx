@@ -13,7 +13,8 @@ import { useNotification } from '../context/NotificationContext';
 export default function Grades() {
   const { user } = useAuth();
   const { addNotification } = useNotification();
-  const themeColor = user?.themeColor || '#0ea5e9';
+  // Fix: Property 'themeColor' does not exist on type 'User'. Did you mean 'themecolor'?
+  const themeColor = user?.themecolor || '#0ea5e9';
   
   const [grades, setGrades] = useState<Grade[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +67,8 @@ export default function Grades() {
            <div className="w-16 h-16 bg-emerald-500 text-white rounded-[1.8rem] flex items-center justify-center shadow-lg"><ClipboardList size={32} /></div>
            <div>
               <h2 className="text-4xl font-black text-gray-900 dark:text-white italic uppercase tracking-tighter">Mes Résultats</h2>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">Suivi académique officiel • {user?.className}</p>
+              {/* Fix: Property 'className' does not exist on type 'User'. Did you mean 'classname'? */}
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">Suivi académique officiel • {user?.classname}</p>
            </div>
         </div>
 
