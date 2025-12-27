@@ -4,7 +4,6 @@ import {
   Plus, Trash2, Lock, Unlock, Loader2, BarChart2, CheckCircle2, 
   MessageCircle, Mail, Copy, X, BarChart3, ChevronRight, 
   Vote, UserCheck, Timer, AlertCircle, PieChart, TrendingUp,
-  // Added Check and ShieldCheck to fix missing name errors
   Check, ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -17,7 +16,6 @@ export default function Polls() {
   const { user, adminViewClass } = useAuth();
   const { addNotification } = useNotification();
   const isMounted = useRef(true);
-  const themeColor = user?.themecolor || '#87CEEB';
   
   const [polls, setPolls] = useState<Poll[]>([]);
   const [classes, setClasses] = useState<ClassGroup[]>([]);
@@ -28,7 +26,6 @@ export default function Polls() {
   const [votingPollId, setVotingPollId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // State for new poll creation
   const [newPoll, setNewPoll] = useState({ 
     question: '', 
     classname: '', 
@@ -56,21 +53,21 @@ export default function Polls() {
     fetchPolls(true);
     API.classes.list().then(data => { if(isMounted.current) setClasses(data); });
     
-    // Real-time subscription
     const subscription = API.polls.subscribe(() => fetchPolls(false));
     return () => { isMounted.current = false; subscription.unsubscribe(); };
   }, [fetchPolls]);
 
   const handleVote = async (pollId: string, optionId: string, currentVoteId?: string | null) => {
+    // Éviter de voter pour la même option ou si un vote est déjà en cours
     if (currentVoteId === optionId || votingPollId) return;
+    
     setVotingPollId(pollId);
     try {
       await API.polls.vote(pollId, optionId);
-      addNotification({ title: 'Vote pris en compte', message: 'Votre choix a été enregistré.', type: 'success' });
-      // The real-time subscription will update the UI, but we fetch to be safe
-      await fetchPolls(false);
+      addNotification({ title: 'Vote enregistré', message: 'Votre choix a été pris en compte.', type: 'success' });
+      fetchPolls(false);
     } catch (error) {
-      addNotification({ title: 'Erreur', message: "Action refusée par le serveur.", type: 'alert' });
+      addNotification({ title: 'Erreur', message: "Le vote n'a pas pu être enregistré.", type: 'alert' });
     } finally {
       if (isMounted.current) setVotingPollId(null);
     }
@@ -197,7 +194,6 @@ export default function Polls() {
 
           return (
             <div key={poll.id} className="group bg-white dark:bg-slate-900 rounded-[4rem] p-8 md:p-14 shadow-soft border-2 border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/30 transition-all flex flex-col lg:flex-row gap-12 relative overflow-hidden">
-               {/* Left: Info & Question */}
                <div className="flex-1 space-y-8">
                   <div className="flex flex-wrap items-center gap-4">
                      <span className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest italic ${isClosed ? 'bg-slate-100 text-slate-400 border border-slate-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/30 animate-pulse'}`}>
@@ -218,25 +214,24 @@ export default function Polls() {
                   {hasVoted && (
                     <div className="p-5 bg-emerald-50 dark:bg-emerald-950/20 rounded-3xl border border-emerald-100 dark:border-emerald-900/30 flex items-center gap-4 text-emerald-600 italic">
                        <CheckCircle2 size={24} />
-                       <span className="text-[11px] font-black uppercase tracking-widest">Votre vote est enregistré. Vous pouvez le modifier tant que le scrutin est ouvert.</span>
+                       <span className="text-[11px] font-black uppercase tracking-widest">Votre vote est enregistré.</span>
                     </div>
                   )}
                </div>
 
-               {/* Middle: Options (The Core) */}
                <div className="flex-1 space-y-4">
                   {poll.options.map(opt => {
                     const isSelected = poll.userVoteOptionId === opt.id;
                     const percent = Math.round((opt.votes / (poll.totalVotes || 1)) * 100);
+                    const isVotingThis = votingPollId === poll.id;
                     
                     return (
                       <button 
                         key={opt.id} 
                         disabled={isClosed || votingPollId !== null} 
                         onClick={() => handleVote(poll.id, opt.id, poll.userVoteOptionId)} 
-                        className={`w-full p-6 rounded-[2rem] border-2 text-left flex justify-between items-center transition-all relative overflow-hidden group/opt ${isSelected ? 'bg-slate-900 text-white border-slate-900 scale-[1.02] shadow-xl' : 'bg-slate-50 dark:bg-slate-800 border-transparent hover:border-indigo-400'}`}
+                        className={`w-full p-6 rounded-[2rem] border-2 text-left flex justify-between items-center transition-all relative overflow-hidden group/opt ${isSelected ? 'bg-slate-900 text-white border-slate-900 scale-[1.02] shadow-xl' : 'bg-slate-50 dark:bg-slate-800 border-transparent hover:border-indigo-400'} ${votingPollId === poll.id ? 'opacity-70 cursor-wait' : ''}`}
                       >
-                        {/* Progress Background */}
                         <div 
                           className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-out opacity-20 ${isSelected ? 'bg-emerald-400' : 'bg-indigo-400'}`} 
                           style={{ width: `${percent}%` }} 
@@ -244,7 +239,7 @@ export default function Polls() {
                         
                         <div className="relative z-10 flex items-center gap-4">
                            <div className={`w-8 h-8 rounded-full border-4 flex items-center justify-center transition-all ${isSelected ? 'border-emerald-400 bg-emerald-400 text-slate-900' : 'border-slate-200 dark:border-slate-700'}`}>
-                             {isSelected && <Check size={16} strokeWidth={4} />}
+                             {isSelected ? <Check size={16} strokeWidth={4} /> : (isVotingThis ? <Loader2 size={12} className="animate-spin" /> : null)}
                            </div>
                            <span className="font-black italic text-sm uppercase tracking-tight">{opt.label}</span>
                         </div>
@@ -258,7 +253,6 @@ export default function Polls() {
                   })}
                </div>
 
-               {/* Right: Actions */}
                <div className="flex lg:flex-col items-center justify-center gap-4 lg:pl-10 lg:border-l border-slate-100 dark:border-slate-800 shrink-0">
                   <button 
                     onClick={() => {
@@ -301,7 +295,6 @@ export default function Polls() {
         )}
       </div>
 
-      {/* Create Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Lancer une Urne Numérique">
         <form onSubmit={handleCreatePoll} className="space-y-8 py-4">
           <div className="space-y-6">
@@ -337,7 +330,7 @@ export default function Polls() {
                 <button 
                   type="button" 
                   onClick={handleAddOption} 
-                  className="text-[10px] font-black uppercase text-indigo-500 hover:underline"
+                  className="text-[10px] font-black uppercase text-indigo-50 hover:underline"
                 >
                   + Ajouter un choix
                 </button>
@@ -383,7 +376,6 @@ export default function Polls() {
         </form>
       </Modal>
 
-      {/* Info footer */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center px-10 gap-10 opacity-50">
           <div className="flex flex-wrap items-center gap-8">
             <div className="flex items-center gap-3"><div className="w-3 h-3 rounded-full bg-indigo-500" /><span className="text-[10px] font-black uppercase tracking-widest italic">Vote Unique</span></div>

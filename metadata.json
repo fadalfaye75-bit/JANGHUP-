@@ -3,6 +3,7 @@
   "description": "Portail Universitaire Unifié - Centralisation académique pour l'ESP Dakar.",
   "requestFramePermissions": [
     "microphone",
-    "camera"
+    "camera",
+    "geolocation"
   ]
 }

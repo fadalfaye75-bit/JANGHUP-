@@ -45,7 +45,7 @@ export default function Layout() {
       { to: '/exams', icon: GraduationCap, label: 'Examens' },
       { to: '/meet', icon: Video, label: 'Directs' },
       { to: '/polls', icon: BarChart2, label: 'Consultations' },
-      { to: '/notifications', icon: Bell, label: 'Alertes' }, // Déplacé en bas
+      { to: '/notifications', icon: Bell, label: 'Alertes' },
     ];
     if (user?.role === UserRole.ADMIN) items.push({ to: '/admin', icon: ShieldCheck, label: 'Admin' });
     return items;
