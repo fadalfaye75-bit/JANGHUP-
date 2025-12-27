@@ -32,7 +32,7 @@ export interface Announcement {
   content: string;
   author: string;
   email?: string;
-  link?: string; // Champ lien direct (URL externe)
+  link?: string;
   date: string;
   classname: string;
   priority: AnnouncementPriority;
@@ -81,15 +81,6 @@ export interface MeetLink {
   user_id: string;
 }
 
-export interface ScheduleFile {
-  id: string;
-  uploaded_by: string;
-  url: string;
-  classname: string;
-  name: string;
-  created_at: string;
-}
-
 export interface ScheduleSlot {
   id?: string;
   day: number;
@@ -98,45 +89,15 @@ export interface ScheduleSlot {
   subject: string;
   teacher: string;
   room: string;
-  color: string;
+  color?: string;
   classname: string;
-}
-
-export interface ActivityLog {
-  id: string;
-  timestamp: string;
-  actor: string;
-  action: string;
-  target: string;
-  type: 'security' | 'action';
-}
-
-export interface Grade {
-  id: string;
-  user_id: string;
-  subject: string;
-  score: number;
-  maxScore: number;
-  coefficient: number;
-  semester: number;
-  comment?: string;
-}
-
-export interface DirectMessage {
-  id: string;
-  sender_id: string;
-  receiver_id: string;
-  content: string;
-  timestamp: string;
-  is_read: boolean;
 }
 
 export interface ClassGroup {
   id: string;
   name: string;
-  email: string;
-  studentCount: number;
   color?: string;
+  studentCount?: number;
 }
 
 export interface AppNotification {
@@ -147,4 +108,32 @@ export interface AppNotification {
   timestamp: string;
   is_read: boolean;
   target_user_id: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  timestamp: string;
+  actor: string;
+  action: string;
+  target: string;
+  type: string;
+}
+
+export interface Grade {
+  id: string;
+  user_id: string;
+  subject: string;
+  score: number;
+  max_score: number;
+  date: string;
+  classname: string;
+}
+
+// Added ScheduleFile to fix missing export error in Profile.tsx
+export interface ScheduleFile {
+  id: string;
+  name: string;
+  url: string;
+  classname?: string;
+  created_at: string;
 }

@@ -1,7 +1,8 @@
 {
-  "name": "JangHup ESP",
-  "description": "Portail Universitaire Premium - Centralisation des ressources académiques de l'ESP Dakar.",
+  "name": "JangHup ESP Premium",
+  "description": "Portail Universitaire Unifié - Centralisation académique pour l'ESP Dakar.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ]
 }

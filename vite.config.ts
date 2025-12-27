@@ -4,8 +4,6 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  // Fix: Configure esbuild to drop console and debugger in production.
-  // This replaces the previous terser configuration which was causing a 'No overload matches this call' error.
   esbuild: {
     drop: ['console', 'debugger'],
     pure: ['console.debug', 'console.info']
@@ -14,13 +12,19 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     minify: 'esbuild',
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-utils': ['lucide-react', 'recharts', 'xlsx']
+          'vendor-ui': ['lucide-react', 'recharts'],
+          'vendor-data': ['xlsx']
         }
       }
     }
+  },
+  server: {
+    port: 3000,
+    host: true
   }
 });

@@ -2,7 +2,10 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   Loader2, Save, Calendar as CalendarIcon, Edit3, Trash2, 
-  FileSpreadsheet, ShieldCheck, Printer, Maximize, Minimize, RefreshCw, Info, Check, X, ChevronRight, Clock
+  ShieldCheck, Printer, Maximize, Minimize, 
+  Info, Check, Clock, RefreshCcw, Download, UploadCloud, MapPin,
+  AlertTriangle, History, Undo2, FileDown, Plus, X, Search,
+  FileSpreadsheet, HelpCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole, ScheduleSlot } from '../types';
@@ -22,8 +25,23 @@ TIME_STEPS.push("18:30");
 
 const DISPLAY_SLOTS = TIME_STEPS.slice(0, -1);
 
-const isPauseSlot = (time: string) => {
-  return time >= "12:00" && time < "14:30";
+const SUBJECT_COLORS: Record<string, string> = {
+  'math': '#3b82f6',
+  'info': '#10b981',
+  'physique': '#f59e0b',
+  'anglais': '#8b5cf6',
+  'eco': '#f43f5e',
+  'droit': '#6366f1',
+  'marketing': '#ec4899',
+  'gestion': '#14b8a6',
+};
+
+const getSubjectColor = (subject: string) => {
+  const s = subject.toLowerCase();
+  for (const [key, color] of Object.entries(SUBJECT_COLORS)) {
+    if (s.includes(key)) return color;
+  }
+  return '#87CEEB';
 };
 
 export default function Schedule() {
@@ -31,34 +49,69 @@ export default function Schedule() {
   const { addNotification } = useNotification();
   
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
+  const [history, setHistory] = useState<ScheduleSlot[][]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Partial<ScheduleSlot> | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeDayMobile, setActiveDayMobile] = useState(new Date().getDay() - 1 < 0 ? 0 : new Date().getDay() - 1);
+  const [conflicts, setConflicts] = useState<string[]>([]);
   
   const excelInputRef = useRef<HTMLInputElement>(null);
 
+  const normalize = (str: string) => str?.trim().toLowerCase() || '';
+
   const currentClassName = useMemo(() => {
-    return (user?.role === UserRole.ADMIN && adminViewClass) ? adminViewClass : (user?.classname || 'Général');
+    if (user?.role === UserRole.ADMIN && adminViewClass) return adminViewClass;
+    return user?.classname || 'Général';
   }, [user, adminViewClass]);
 
-  // LOGIQUE DE PERMISSION CRITIQUE : Délégués et Admins
   const canEdit = useMemo(() => {
     if (!user) return false;
-    // Admins : Pleins pouvoirs
-    if (user.role === UserRole.ADMIN) return true;
-    
-    // Délégués : Uniquement si la classe visualisée est la leur
-    if (user.role === UserRole.DELEGATE) {
-      const uClass = String(user.classname || '').trim().toLowerCase();
-      const vClass = String(currentClassName || '').trim().toLowerCase();
-      // On compare sans tenir compte des espaces superflus ou de la casse
-      return uClass !== '' && uClass === vClass;
+    const role = String(user.role).toUpperCase();
+    if (role === 'ADMIN') return true;
+    if (role === 'DELEGATE') {
+      return normalize(user.classname) === normalize(currentClassName);
     }
     return false;
   }, [user, currentClassName]);
+
+  const checkConflicts = useCallback((currentSlots: ScheduleSlot[]) => {
+    const newConflicts: string[] = [];
+    currentSlots.forEach((s1, i) => {
+      currentSlots.forEach((s2, j) => {
+        if (i === j) return;
+        if (s1.day === s2.day) {
+          const start1 = TIME_STEPS.indexOf(s1.starttime);
+          const end1 = TIME_STEPS.indexOf(s1.endtime);
+          const start2 = TIME_STEPS.indexOf(s2.starttime);
+          const end2 = TIME_STEPS.indexOf(s2.endtime);
+          if ((start1 < end2 && end1 > start2)) {
+            newConflicts.push(s1.id || `conflict-${i}`);
+          }
+        }
+      });
+    });
+    setConflicts(newConflicts);
+  }, []);
+
+  const updateSlotsWithHistory = useCallback((newSlots: ScheduleSlot[]) => {
+    setHistory(prev => [slots, ...prev].slice(0, 10));
+    setSlots(newSlots);
+    setHasUnsavedChanges(true);
+    checkConflicts(newSlots);
+  }, [slots, checkConflicts]);
+
+  const handleUndo = () => {
+    if (history.length > 0) {
+      const prev = history[0];
+      setHistory(prevHistory => prevHistory.slice(1));
+      setSlots(prev);
+      checkConflicts(prev);
+    }
+  };
 
   const fetchData = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -68,21 +121,35 @@ export default function Schedule() {
         ...s,
         starttime: (s.starttime || "").padStart(5, '0'),
         endtime: (s.endtime || "").padStart(5, '0'),
+        color: s.color || getSubjectColor(s.subject)
       }));
       setSlots(normalized);
+      setHistory([]);
       setHasUnsavedChanges(false);
+      checkConflicts(normalized);
     } catch (error) {
-      addNotification({ title: 'Erreur Sync', message: "Grille inaccessible.", type: 'alert' });
+      addNotification({ title: 'Erreur Sync', message: "Impossible de charger le planning.", type: 'alert' });
     } finally {
       setLoading(false);
     }
-  }, [currentClassName, addNotification]);
+  }, [currentClassName, addNotification, checkConflicts]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      { Jour: "Lundi", Début: "08:00", Fin: "10:00", Matière: "Mathématiques", Prof: "M. SARR", Salle: "Amphi 1" },
+      { Jour: "Mardi", Début: "10:30", Fin: "12:30", Matière: "Informatique", Prof: "Mme. DIOP", Salle: "Labo A" },
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Modèle_Planning");
+    XLSX.writeFile(wb, "Modele_JangHup_Planning.xlsx");
+    addNotification({ title: 'Modèle prêt', message: 'Remplissez le fichier et ré-importez-le.', type: 'info' });
+  };
 
   const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canEdit) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -95,63 +162,78 @@ export default function Schedule() {
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
         if (data.length === 0) {
-          addNotification({ title: 'Fichier vide', message: "Aucune donnée trouvée dans le fichier.", type: 'warning' });
+          addNotification({ title: 'Erreur', message: "Le fichier Excel est vide.", type: 'warning' });
           return;
         }
 
         const importedSlots: ScheduleSlot[] = data.map((row, idx) => {
-          // Normalisation des clés pour supporter plusieurs noms de colonnes
-          const findKey = (keys: string[]) => {
-            const rowKey = Object.keys(row).find(k => keys.some(target => k.toLowerCase().includes(target.toLowerCase())));
-            return rowKey ? row[rowKey] : null;
+          const getVal = (variants: string[]) => {
+            const key = Object.keys(row).find(k => variants.some(v => k.toLowerCase().includes(v.toLowerCase())));
+            return key ? row[key] : null;
           };
 
-          const rawDay = (findKey(["Jour", "Day"]) || "").toString();
-          const dayIdx = DAYS.findIndex(d => d.toLowerCase() === rawDay.toLowerCase() || d.toLowerCase().includes(rawDay.toLowerCase()));
+          const rawDay = (getVal(["Jour", "Day", "Date"]) || "").toString();
+          const dayIdx = DAYS.findIndex(d => normalize(d) === normalize(rawDay) || normalize(d).includes(normalize(rawDay)));
           
-          const start = (findKey(["Début", "Start"]) || "08:00").toString().padStart(5, '0');
-          const end = (findKey(["Fin", "End"]) || "10:00").toString().padStart(5, '0');
-          const subj = findKey(["Matière", "Subject", "Module"]) || "Sans titre";
-          const prof = findKey(["Prof", "Enseignant", "Teacher"]) || "À définir";
-          const room = findKey(["Salle", "Room"]) || "TBD";
+          let start = (getVal(["Début", "Start", "Heure", "Time"]) || "08:00").toString().replace('h', ':').padStart(5, '0');
+          let end = (getVal(["Fin", "End", "Jusqu'à"]) || "10:00").toString().replace('h', ':').padStart(5, '0');
+          const subject = getVal(["Matière", "Subject", "Module", "Cours"]) || "Inconnu";
+          const teacher = getVal(["Prof", "Enseignant", "Teacher"]) || "À définir";
+          const room = getVal(["Salle", "Room", "Lieu"]) || "ESP";
 
           return {
-            id: `import-${idx}-${Date.now()}`,
+            id: `temp-${idx}-${Date.now()}`,
             day: dayIdx,
             starttime: start,
             endtime: end,
-            subject: subj.toString(),
-            teacher: prof.toString(),
+            subject: subject.toString(),
+            teacher: teacher.toString(),
             room: room.toString(),
-            color: "#FFFFFF",
+            color: getSubjectColor(subject.toString()),
             classname: currentClassName
           };
         }).filter(s => s.day !== -1);
 
         if (importedSlots.length > 0) {
-          setSlots(importedSlots);
-          setHasUnsavedChanges(true);
-          addNotification({ title: 'Importation Réussie', message: `${importedSlots.length} cours détectés. N'oubliez pas de sauvegarder.`, type: 'success' });
+          updateSlotsWithHistory(importedSlots);
+          addNotification({ title: 'Import Réussi', message: `${importedSlots.length} cours chargés. Cliquez sur Synchroniser pour valider.`, type: 'success' });
         } else {
-          addNotification({ title: 'Format invalide', message: "Vérifiez que vos colonnes s'appellent : Jour, Début, Fin, Matière.", type: 'alert' });
+          addNotification({ title: 'Échec', message: "Format non reconnu. Utilisez le modèle Excel.", type: 'alert' });
         }
       } catch (err) {
-        addNotification({ title: 'Erreur', message: "Échec de lecture du fichier Excel.", type: 'alert' });
+        addNotification({ title: 'Erreur', message: "Lecture du fichier impossible.", type: 'alert' });
       }
     };
     reader.readAsBinaryString(file);
     if (excelInputRef.current) excelInputRef.current.value = '';
   };
 
+  const handleExportExcel = () => {
+    const data = slots.map(s => ({
+      Jour: DAYS[s.day],
+      Début: s.starttime,
+      Fin: s.endtime,
+      Matière: s.subject,
+      Prof: s.teacher,
+      Salle: s.room
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Planning");
+    XLSX.writeFile(wb, `Planning_${currentClassName}.xlsx`);
+  };
+
   const handleSave = async () => {
+    if (!canEdit) return;
     setSaving(true);
     try {
       await API.schedules.saveSlots(currentClassName, slots);
-      addNotification({ title: 'Enregistré', message: 'L\'emploi du temps a été mis à jour avec succès.', type: 'success' });
+      addNotification({ title: 'Succès', message: 'Le planning est maintenant à jour pour tous.', type: 'success' });
       setHasUnsavedChanges(false);
+      setHistory([]);
       fetchData(true);
     } catch (e: any) {
-      addNotification({ title: 'Action refusée', message: e.message, type: 'alert' });
+      addNotification({ title: 'Erreur', message: "La sauvegarde a échoué.", type: 'alert' });
     } finally {
       setSaving(false);
     }
@@ -173,37 +255,32 @@ export default function Schedule() {
       const startIdx = TIME_STEPS.indexOf(slot.starttime);
       const endIdx = TIME_STEPS.indexOf(slot.endtime);
       const durationRows = Math.max(1, endIdx - startIdx);
+      const isConflict = conflicts.includes(slot.id || '');
 
       return (
         <div 
           key={slot.id || `${dayIdx}-${time}`}
           onClick={() => { if(canEdit) { setSelectedSlot(slot); setShowEditModal(true); } }}
-          className={`absolute inset-[1px] p-2 md:p-4 border-[2px] md:border-[3px] border-black dark:border-white bg-white dark:bg-slate-800 flex flex-col items-center justify-center text-center z-10 transition-all hover:bg-slate-50 dark:hover:bg-slate-700 overflow-hidden ${canEdit ? 'cursor-pointer' : ''}`}
+          className={`absolute inset-[3px] p-2 md:p-3 bg-white dark:bg-slate-800 border-2 rounded-2xl flex flex-col items-center justify-center text-center z-10 transition-all hover:shadow-xl overflow-hidden group ${canEdit ? 'cursor-pointer active:scale-95' : ''} ${isConflict ? 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'border-slate-900 dark:border-white shadow-sm'}`}
           style={{ height: `calc(${durationRows} * 100% + ${(durationRows - 1) * 1}px)` }}
         >
-          <div className="flex flex-col gap-1 max-w-full">
-            <p className="text-[10px] md:text-xs font-black uppercase text-slate-900 dark:text-white leading-tight italic line-clamp-3">
+          <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: slot.color }} />
+          <div className="flex flex-col gap-0.5 w-full">
+            <p className="text-[10px] md:text-[11px] font-black uppercase text-slate-900 dark:text-white leading-tight italic tracking-tighter break-words">
               {slot.subject}
             </p>
-            <p className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase truncate">
+            <p className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase truncate">
               {slot.teacher}
             </p>
-            <div className="w-1/2 h-[1px] bg-slate-200 dark:bg-slate-600 mx-auto my-1" />
-            <p className="text-[10px] md:text-[11px] font-black text-slate-900 dark:text-brand tracking-tighter uppercase italic">
-              Salle: {slot.room}
+            <div className="w-1/4 h-[1px] bg-slate-100 dark:bg-slate-700 mx-auto my-1.5" />
+            <p className="text-[9px] md:text-[10px] font-black text-brand uppercase italic flex items-center justify-center gap-1">
+               <MapPin size={10} className="hidden md:block"/> {slot.room}
             </p>
           </div>
-          {canEdit && <Edit3 size={10} className="absolute top-1 right-1 opacity-0 group-hover/slot:opacity-40 no-print" />}
+          {isConflict && <AlertTriangle size={14} className="absolute bottom-2 right-2 text-rose-500 animate-pulse" />}
+          {canEdit && <Edit3 size={12} className="absolute top-2 right-2 opacity-0 group-hover:opacity-40 transition-opacity no-print" />}
         </div>
       );
-    }
-
-    if (isPauseSlot(time)) {
-        return (
-          <div className="w-full h-full bg-slate-100/50 dark:bg-slate-800/20 border-b border-r border-slate-200 dark:border-slate-800 flex items-center justify-center select-none">
-             {time === "13:00" && <span className="text-[9px] font-black tracking-[0.6em] text-slate-300 uppercase italic">PAUSE</span>}
-          </div>
-        );
     }
 
     return (
@@ -212,81 +289,121 @@ export default function Schedule() {
           if(canEdit) {
             const startIdx = TIME_STEPS.indexOf(time);
             setSelectedSlot({ 
-              day: dayIdx, starttime: time, endtime: TIME_STEPS[startIdx + 3] || "18:30", 
-              subject: '', teacher: '', room: '', classname: currentClassName 
+              day: dayIdx, starttime: time, endtime: TIME_STEPS[startIdx + 4] || "18:30", 
+              subject: '', teacher: '', room: '', classname: currentClassName, color: '#87CEEB'
             });
             setShowEditModal(true);
           }
         }}
-        className={`w-full h-full border-b border-r border-slate-200 dark:border-slate-800 transition-colors ${canEdit ? 'hover:bg-brand-50 cursor-crosshair' : ''}`}
+        className={`w-full h-full border-b border-r border-slate-100 dark:border-slate-800/50 transition-colors ${canEdit ? 'hover:bg-brand/5 cursor-crosshair' : ''}`}
       />
     );
   };
 
   if (loading) return (
-    <div className="flex flex-col justify-center items-center py-24 gap-6">
-        <Loader2 className="animate-spin text-brand" size={48} />
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic animate-pulse">Initialisation de l'emploi du temps...</p>
+    <div className="flex flex-col justify-center items-center py-40 gap-8">
+        <Loader2 className="animate-spin text-brand" size={64} />
+        <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest italic animate-pulse">Initialisation JANGHUP Sync...</p>
     </div>
   );
 
   return (
-    <div className={`max-w-[1600px] mx-auto space-y-6 animate-fade-in pb-32 px-4 ${isFullscreen ? 'fixed inset-0 z-[100] bg-white dark:bg-slate-950 p-6 overflow-auto' : ''}`}>
+    <div className={`max-w-7xl mx-auto space-y-12 animate-fade-in pb-40 px-4 ${isFullscreen ? 'fixed inset-0 z-[100] bg-white dark:bg-slate-950 p-8 overflow-auto' : ''}`}>
       
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 no-print">
-        <div className="flex items-center gap-6">
-           <div className="w-14 h-14 bg-slate-900 text-white rounded-[1.5rem] flex items-center justify-center shadow-lg"><CalendarIcon size={28} /></div>
+      {/* Header & Controls */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-10 no-print">
+        <div className="flex items-center gap-8">
+           <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-900 text-white rounded-[2.2rem] flex items-center justify-center shadow-premium transform -rotate-3"><CalendarIcon size={36} /></div>
            <div>
-              <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">Planning de cours</h2>
-              <div className="flex items-center gap-3 mt-2">
-                 <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase rounded-lg border border-slate-200 dark:border-slate-700 italic">Classe: {currentClassName}</span>
-                 {canEdit && <span className="px-3 py-1 bg-amber-50 text-amber-600 text-[9px] font-black uppercase rounded-lg border border-amber-100 flex items-center gap-2"><ShieldCheck size={12}/> Gestionnaire</span>}
+              <h2 className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white uppercase italic tracking-tighter leading-none">Planning</h2>
+              <div className="flex flex-wrap items-center gap-4 mt-4">
+                 <span className="px-5 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase rounded-2xl border border-slate-200 dark:border-slate-700 italic">{currentClassName}</span>
+                 {canEdit && <span className="px-5 py-2 bg-emerald-500 text-white text-[10px] font-black uppercase rounded-2xl flex items-center gap-2 shadow-lg italic animate-pulse"><ShieldCheck size={16}/> Espace Délégué</span>}
               </div>
            </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-             <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:shadow-md transition-all">
-                {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
-             </button>
-
-             <button onClick={() => window.print()} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:shadow-md transition-all">
-                <Printer size={18} />
-             </button>
-
-             {canEdit && (
-               <>
-                <input type="file" ref={excelInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleExcelImport} />
-                <button onClick={() => excelInputRef.current?.click()} className="bg-emerald-600 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg hover:brightness-110 transition-all italic">
-                    <FileSpreadsheet size={16} /> Import Excel
+        <div className="flex flex-wrap items-center gap-4">
+             <div className="flex p-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[1.8rem] shadow-soft">
+                <button onClick={() => setIsFullscreen(!isFullscreen)} title="Plein écran" className="p-3.5 text-slate-400 hover:text-brand transition-all">
+                  {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
                 </button>
-                <button onClick={handleSave} disabled={saving || !hasUnsavedChanges} className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2 transition-all italic ${hasUnsavedChanges ? 'bg-slate-900 text-white animate-pulse' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
-                  {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
-                  {hasUnsavedChanges ? "Sauvegarder" : "À jour"}
+                <button onClick={() => window.print()} title="Imprimer" className="p-3.5 text-slate-400 hover:text-brand transition-all">
+                  <Printer size={24} />
                 </button>
-               </>
-             )}
+                <button onClick={handleExportExcel} title="Télécharger Excel" className="p-3.5 text-slate-400 hover:text-brand transition-all">
+                  <FileSpreadsheet size={24} />
+                </button>
+                <button onClick={() => fetchData()} title="Actualiser" className="p-3.5 text-slate-400 hover:text-brand transition-all">
+                  <RefreshCcw size={24} />
+                </button>
+             </div>
         </div>
       </div>
 
-      <section id="planning-print-area" className="bg-white dark:bg-slate-900 border-[3px] md:border-[4px] border-slate-900 dark:border-white overflow-hidden shadow-2xl">
+      {/* Delegate Toolbar */}
+      {canEdit && (
+        <div className="bg-emerald-600 text-white p-8 sm:p-10 rounded-[3rem] shadow-premium flex flex-col md:flex-row items-center justify-between gap-8 animate-in slide-in-from-top-4 duration-500 no-print">
+            <div className="flex items-center gap-6">
+               <div className="w-16 h-16 bg-white/20 rounded-3xl flex items-center justify-center"><UploadCloud size={32} /></div>
+               <div>
+                  <h3 className="text-xl font-black uppercase italic tracking-tighter">Outils de Gestion</h3>
+                  <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest mt-1">Mettez à jour le planning par import Excel ou manuellement.</p>
+               </div>
+            </div>
+            
+            <div className="flex flex-wrap justify-center gap-4">
+               <button onClick={handleDownloadTemplate} className="px-8 py-4 bg-white/10 hover:bg-white/20 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all border border-white/20 italic">
+                  <HelpCircle size={18} /> Modèle Excel
+               </button>
+               <input type="file" ref={excelInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleExcelImport} />
+               <button onClick={() => excelInputRef.current?.click()} className="px-10 py-4 bg-white text-emerald-600 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-2xl active:scale-95 transition-all italic">
+                  <FileDown size={18} /> Importer Fichier
+               </button>
+               {hasUnsavedChanges && (
+                 <button onClick={handleSave} disabled={saving} className="px-10 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-2xl active:scale-95 transition-all italic border-2 border-white/30 animate-pulse">
+                   {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Synchroniser
+                 </button>
+               )}
+               {history.length > 0 && (
+                 <button onClick={handleUndo} className="p-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all" title="Annuler">
+                   <Undo2 size={24} />
+                 </button>
+               )}
+            </div>
+        </div>
+      )}
+
+      {/* Mobile Day Selector */}
+      <div className="lg:hidden flex overflow-x-auto gap-4 pb-10 no-print custom-scrollbar">
+          {DAYS.map((day, idx) => (
+            <button key={day} onClick={() => setActiveDayMobile(idx)} className={`px-12 py-5 rounded-[1.8rem] text-[11px] font-black uppercase tracking-widest italic transition-all whitespace-nowrap shadow-sm border ${activeDayMobile === idx ? 'bg-slate-900 text-white border-slate-900 scale-105' : 'bg-white dark:bg-slate-800 text-slate-400 border-slate-100 dark:border-slate-700'}`}>
+              {day}
+            </button>
+          ))}
+      </div>
+
+      {/* Main Grid */}
+      <section id="planning-print-area" className="bg-white dark:bg-slate-900 border-[6px] border-slate-900 dark:border-white rounded-[4rem] overflow-hidden shadow-premium relative">
          <div className="overflow-x-auto custom-scrollbar">
-            <div className="min-w-[900px]">
-               <div className="grid grid-cols-[80px_repeat(6,1fr)] bg-slate-800 border-b-[3px] border-slate-900">
-                  <div className="h-14 flex items-center justify-center border-r-[2px] border-white/20 text-white font-black text-2xl italic">H</div>
-                  {DAYS.map(day => (
-                    <div key={day} className="h-14 flex items-center justify-center font-black italic uppercase text-lg tracking-widest text-white border-r-[2px] border-white/20 last:border-0">{day}</div>
+            <div className="min-w-[1100px] lg:min-w-full">
+               <div className="grid grid-cols-[130px_repeat(6,1fr)] bg-slate-900 border-b-[6px] border-slate-900">
+                  <div className="h-16 flex items-center justify-center border-r-[1px] border-white/10 text-white font-black text-3xl italic">H</div>
+                  {DAYS.map((day, idx) => (
+                    <div key={day} className={`h-16 flex items-center justify-center font-black italic uppercase text-xs tracking-[0.4em] text-white border-r-[1px] border-white/10 last:border-0 ${activeDayMobile !== idx ? 'lg:flex hidden' : 'flex'}`}>
+                      {day}
+                    </div>
                   ))}
                </div>
                
                <div className="relative">
                   {DISPLAY_SLOTS.map((time) => (
-                    <div key={time} className="grid grid-cols-[80px_repeat(6,1fr)] h-12">
-                       <div className="flex items-center justify-center border-r-[3px] border-slate-900 bg-slate-50 dark:bg-slate-800 font-black text-[11px] italic text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800">
+                    <div key={time} className="grid grid-cols-[130px_repeat(6,1fr)] h-20">
+                       <div className="flex items-center justify-center border-r-[6px] border-slate-900 bg-slate-50 dark:bg-slate-800 font-black text-[12px] italic text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 shadow-inner">
                           {time}
                        </div>
                        {DAYS.map((_, dayIdx) => (
-                          <div key={dayIdx} className="relative h-full">
+                          <div key={dayIdx} className={`relative h-full ${activeDayMobile !== dayIdx ? 'lg:block hidden' : 'block'}`}>
                              {renderGridCell(dayIdx, time)}
                           </div>
                        ))}
@@ -297,68 +414,65 @@ export default function Schedule() {
          </div>
       </section>
 
-      <div className="flex flex-col sm:flex-row justify-between items-center px-4 no-print gap-4">
-          <div className="flex items-center gap-3 p-4 bg-slate-100 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
-            <Info size={18} className="text-brand" />
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest italic leading-relaxed">
-              Standard ESP • Pas de 30 min • Grille académique officielle.
+      {/* Legend */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center px-10 no-print gap-10">
+          <div className="flex flex-wrap items-center gap-8 p-8 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-soft">
+            <div className="flex items-center gap-3"><div className="w-4 h-4 rounded-full bg-rose-500 animate-pulse" /><span className="text-[10px] font-black uppercase tracking-widest italic">Conflit</span></div>
+            <div className="flex items-center gap-3"><div className="w-4 h-4 rounded-full bg-brand" /><span className="text-[10px] font-black uppercase tracking-widest italic">Standard</span></div>
+            <div className="w-[1px] h-6 bg-slate-100 dark:bg-slate-800 hidden md:block" />
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest italic leading-relaxed">
+              Planning Officiel {currentClassName} • Cycle 8h - 18h30
             </p>
           </div>
-          <div className="flex items-center gap-2 opacity-30 italic">
-             <Clock size={14} />
-             <span className="text-[9px] font-black uppercase tracking-widest">Généré via JANGHUP PREMIUM</span>
+          <div className="flex items-center gap-6 text-slate-300 dark:text-slate-800 italic">
+             <History size={24} />
+             <span className="text-[11px] font-black uppercase tracking-[0.6em]">SYNCHRONISATION OK</span>
           </div>
       </div>
 
-      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Gestion du créneau">
+      {/* Edit Modal */}
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Modifier la séance">
         {selectedSlot && (
           <form onSubmit={(e) => {
             e.preventDefault();
-            const newSlot = selectedSlot as ScheduleSlot;
+            const newSlot = { ...selectedSlot, color: getSubjectColor(selectedSlot.subject || '') } as ScheduleSlot;
             const newId = selectedSlot.id || `temp-${Date.now()}`;
-            if (selectedSlot.id) {
-              setSlots(prev => prev.map(s => s.id === selectedSlot.id ? { ...newSlot, id: newId } : s));
-            } else {
-              setSlots(prev => [...prev, { ...newSlot, id: newId }]);
-            }
-            setHasUnsavedChanges(true);
+            let newSlotsList = selectedSlot.id ? slots.map(s => s.id === selectedSlot.id ? { ...newSlot, id: newId } : s) : [...slots, { ...newSlot, id: newId }];
+            updateSlotsWithHistory(newSlotsList);
             setShowEditModal(false);
-          }} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Module / Matière</label>
-              <input required value={selectedSlot.subject} onChange={e => setSelectedSlot({...selectedSlot, subject: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl font-bold italic outline-none border-2 border-transparent focus:border-slate-900" />
+          }} className="space-y-8">
+            <div className="space-y-3">
+              <label className="text-[11px] font-black uppercase text-slate-400 ml-2 italic">Module / Matière</label>
+              <input required value={selectedSlot.subject} onChange={e => setSelectedSlot({...selectedSlot, subject: e.target.value})} className="w-full p-6 bg-slate-50 dark:bg-slate-800 rounded-[1.8rem] font-black italic outline-none border-2 border-transparent focus:border-brand transition-all text-sm" placeholder="Ex: Algorithmique" />
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Salle</label>
-                <input required placeholder="DGE-Mezz G" value={selectedSlot.room} onChange={e => setSelectedSlot({...selectedSlot, room: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl font-bold italic border-none" />
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <label className="text-[11px] font-black uppercase text-slate-400 ml-2 italic">Salle</label>
+                <input required placeholder="Amphi IP" value={selectedSlot.room} onChange={e => setSelectedSlot({...selectedSlot, room: e.target.value})} className="w-full p-6 bg-slate-50 dark:bg-slate-800 rounded-[1.5rem] font-bold italic border-none outline-none text-sm" />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Enseignant</label>
-                <input required placeholder="Dr. SY" value={selectedSlot.teacher} onChange={e => setSelectedSlot({...selectedSlot, teacher: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl font-bold italic border-none" />
+              <div className="space-y-3">
+                <label className="text-[11px] font-black uppercase text-slate-400 ml-2 italic">Professeur</label>
+                <input required placeholder="M. SARR" value={selectedSlot.teacher} onChange={e => setSelectedSlot({...selectedSlot, teacher: e.target.value})} className="w-full p-6 bg-slate-50 dark:bg-slate-800 rounded-[1.5rem] font-bold italic border-none outline-none text-sm" />
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-               <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Début</label>
-                  <select value={selectedSlot.starttime} onChange={e => setSelectedSlot({...selectedSlot, starttime: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl font-black text-[11px] uppercase border-none outline-none">
+            <div className="grid grid-cols-2 gap-6">
+               <div className="space-y-3">
+                  <label className="text-[11px] font-black uppercase text-slate-400 ml-2 italic">Début</label>
+                  <select value={selectedSlot.starttime} onChange={e => setSelectedSlot({...selectedSlot, starttime: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-[1.5rem] font-black text-[12px] uppercase outline-none shadow-sm cursor-pointer italic">
                     {DISPLAY_SLOTS.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                </div>
-               <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-1 italic">Fin</label>
-                  <select value={selectedSlot.endtime} onChange={e => setSelectedSlot({...selectedSlot, endtime: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-xl font-black text-[11px] uppercase border-none outline-none">
+               <div className="space-y-3">
+                  <label className="text-[11px] font-black uppercase text-slate-400 ml-2 italic">Fin</label>
+                  <select value={selectedSlot.endtime} onChange={e => setSelectedSlot({...selectedSlot, endtime: e.target.value})} className="w-full p-5 bg-slate-50 dark:bg-slate-800 rounded-[1.5rem] font-black text-[12px] uppercase outline-none shadow-sm cursor-pointer italic">
                     {TIME_STEPS.slice(TIME_STEPS.indexOf(selectedSlot.starttime || "08:00") + 1).map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                </div>
             </div>
-
-            <div className="flex gap-4 pt-4">
-               <button type="submit" className="flex-1 bg-slate-900 text-white py-4 rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl italic flex items-center justify-center gap-3"><Check size={20}/> Confirmer</button>
+            <div className="flex gap-4 pt-10">
+               <button type="submit" className="flex-1 bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase text-xs tracking-[0.3em] shadow-premium italic flex items-center justify-center gap-3 active:scale-95 transition-all"><Check size={20}/> Valider</button>
                {selectedSlot.id && (
-                 <button type="button" onClick={() => { setSlots(prev => prev.filter(s => s.id !== selectedSlot.id)); setHasUnsavedChanges(true); setShowEditModal(false); }} className="p-4 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all"><Trash2 size={24}/></button>
+                 <button type="button" onClick={() => { if(confirm("Supprimer ?")) { updateSlotsWithHistory(slots.filter(s => s.id !== selectedSlot.id)); setShowEditModal(false); } }} className="p-6 bg-rose-50 text-rose-500 rounded-[2rem] hover:bg-rose-500 hover:text-white transition-all shadow-sm active:scale-90"><Trash2 size={24}/></button>
                )}
             </div>
           </form>
@@ -367,13 +481,13 @@ export default function Schedule() {
 
       <style>{`
         @media print {
-          body { background: white !important; }
-          #planning-print-area { border: 2px solid black !important; border-radius: 0 !important; transform: scale(0.98); transform-origin: top center; width: 100% !important; margin: 0 !important; }
+          body { background: white !important; -webkit-print-color-adjust: exact; }
+          #planning-print-area { border: 6px solid black !important; border-radius: 0 !important; transform: scale(0.9); transform-origin: top center; width: 100% !important; margin: 0 !important; box-shadow: none !important; }
           .no-print { display: none !important; }
           #planning-print-area * { color: black !important; border-color: black !important; }
-          #planning-print-area .bg-slate-800 { background-color: #000 !important; -webkit-print-color-adjust: exact; }
-          #planning-print-area .text-white { color: #fff !important; -webkit-print-color-adjust: exact; }
-          #planning-print-area .bg-slate-50 { background-color: #f1f5f9 !important; -webkit-print-color-adjust: exact; }
+          #planning-print-area .bg-slate-900 { background-color: #000 !important; color: #fff !important; }
+          #planning-print-area .bg-slate-50, #planning-print-area .bg-slate-800 { background-color: #f1f5f9 !important; }
+          @page { size: landscape; margin: 1cm; }
         }
       `}</style>
     </div>
