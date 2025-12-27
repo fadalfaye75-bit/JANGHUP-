@@ -4,10 +4,11 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Megaphone, Calendar, GraduationCap, Video, 
   BarChart2, LogOut, Menu, Moon, Sun, 
-  ShieldCheck, School, X
+  ShieldCheck, School, X, Bell
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
+import { useNotification } from '../context/NotificationContext';
 
 export const UserAvatar = React.memo(({ name, color, className = "w-10 h-10", textClassName = "text-xs" }: { name: string, color?: string, className?: string, textClassName?: string }) => {
   const initials = useMemo(() => {
@@ -26,6 +27,7 @@ export const UserAvatar = React.memo(({ name, color, className = "w-10 h-10", te
 
 export default function Layout() {
   const { user, logout, toggleTheme, isDarkMode } = useAuth();
+  const { unreadCount } = useNotification();
   const navigate = useNavigate();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
@@ -43,6 +45,7 @@ export default function Layout() {
       { to: '/exams', icon: GraduationCap, label: 'Examens' },
       { to: '/meet', icon: Video, label: 'Directs' },
       { to: '/polls', icon: BarChart2, label: 'Consultations' },
+      { to: '/notifications', icon: Bell, label: 'Alertes' }, // Déplacé en bas
     ];
     if (user?.role === UserRole.ADMIN) items.push({ to: '/admin', icon: ShieldCheck, label: 'Admin' });
     return items;
@@ -69,6 +72,11 @@ export default function Layout() {
               <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `flex items-center gap-4 px-5 py-4 text-xs font-bold uppercase tracking-widest rounded-2xl transition-all ${isActive ? 'bg-brand text-white shadow-premium italic' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
                 <item.icon size={20} />
                 <span className="truncate">{item.label}</span>
+                {item.to === '/notifications' && unreadCount > 0 && (
+                  <span className="ml-auto w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center animate-pulse shadow-lg">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
@@ -89,6 +97,14 @@ export default function Layout() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+             <button onClick={() => navigate('/notifications')} className="relative p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-lg animate-bounce">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+             </button>
              <button onClick={toggleTheme} className="p-2.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">
                 {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
              </button>
@@ -106,7 +122,14 @@ export default function Layout() {
         <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 glass border-t border-slate-100 dark:border-slate-800 z-50 flex items-center justify-around px-4">
            {navItems.slice(0, 5).map((item) => (
               <NavLink key={item.to} to={item.to} className={({ isActive }) => `flex flex-col items-center justify-center gap-1 transition-all ${isActive ? 'text-brand scale-110' : 'text-slate-400'}`}>
-                 <item.icon size={20} />
+                 <div className="relative">
+                    <item.icon size={20} />
+                    {item.to === '/notifications' && unreadCount > 0 && (
+                      <span className="absolute -top-2 -right-2 w-4 h-4 bg-rose-500 text-white text-[8px] font-black rounded-full flex items-center justify-center shadow-lg">
+                        {unreadCount}
+                      </span>
+                    )}
+                 </div>
                  <span className="text-[8px] font-black uppercase tracking-widest">{item.label.split(' ')[0]}</span>
               </NavLink>
            ))}
