@@ -77,6 +77,7 @@ export const API = {
         user_id: user?.id, 
         author: profile?.name || 'Admin', 
         email: profile?.email || '',
+        link: ann.link || '', // Enregistrement du lien
         date: new Date().toISOString() 
       }]);
       if (error) throw error;
@@ -204,8 +205,9 @@ export const API = {
       const { data: profile } = await supabase.from('profiles').select('role, classname').eq('id', authUser.id).single();
       if (!profile) throw new Error("Profil introuvable");
 
-      if (profile.role !== UserRole.ADMIN && (profile.role !== UserRole.DELEGATE || profile.classname !== classname)) {
-        throw new Error("Vous n'avez pas les permissions pour modifier cette classe");
+      // Vérification robuste des permissions pour les délégués
+      if (profile.role !== UserRole.ADMIN && (profile.role !== UserRole.DELEGATE || profile.classname?.trim().toLowerCase() !== classname?.trim().toLowerCase())) {
+        throw new Error("Vous n'avez pas les permissions pour modifier l'emploi du temps de cette classe");
       }
 
       const { error: delError } = await supabase.from('schedule_slots').delete().eq('classname', classname);
@@ -234,7 +236,7 @@ export const API = {
       const { data: profile } = await supabase.from('profiles').select('role, classname').eq('id', authUser.id).single();
       if (!profile) throw new Error("Profil introuvable");
 
-      if (profile.role !== UserRole.ADMIN && (profile.role !== UserRole.DELEGATE || profile.classname !== classname)) {
+      if (profile.role !== UserRole.ADMIN && (profile.role !== UserRole.DELEGATE || profile.classname?.trim().toLowerCase() !== classname?.trim().toLowerCase())) {
         throw new Error("Vous ne pouvez téléverser des documents que pour votre propre classe");
       }
 

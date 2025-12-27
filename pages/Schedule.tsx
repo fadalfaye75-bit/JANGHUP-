@@ -44,14 +44,18 @@ export default function Schedule() {
     return (user?.role === UserRole.ADMIN && adminViewClass) ? adminViewClass : (user?.classname || 'Général');
   }, [user, adminViewClass]);
 
-  // Correction : On assure que canEdit est vrai pour le délégué quand il regarde sa propre classe.
+  // LOGIQUE DE PERMISSION CRITIQUE : Délégués et Admins
   const canEdit = useMemo(() => {
     if (!user) return false;
+    // Admins : Pleins pouvoirs
     if (user.role === UserRole.ADMIN) return true;
+    
+    // Délégués : Uniquement si la classe visualisée est la leur
     if (user.role === UserRole.DELEGATE) {
-      const userClass = (user.classname || '').trim().toLowerCase();
-      const viewingClass = (currentClassName || '').trim().toLowerCase();
-      return userClass === viewingClass;
+      const uClass = String(user.classname || '').trim().toLowerCase();
+      const vClass = String(currentClassName || '').trim().toLowerCase();
+      // On compare sans tenir compte des espaces superflus ou de la casse
+      return uClass !== '' && uClass === vClass;
     }
     return false;
   }, [user, currentClassName]);
@@ -90,18 +94,35 @@ export default function Schedule() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json(ws) as any[];
 
+        if (data.length === 0) {
+          addNotification({ title: 'Fichier vide', message: "Aucune donnée trouvée dans le fichier.", type: 'warning' });
+          return;
+        }
+
         const importedSlots: ScheduleSlot[] = data.map((row, idx) => {
-          const rawDay = (row.Jour || row.Day || "").toString();
-          const dayIdx = DAYS.findIndex(d => d.toLowerCase() === rawDay.toLowerCase());
+          // Normalisation des clés pour supporter plusieurs noms de colonnes
+          const findKey = (keys: string[]) => {
+            const rowKey = Object.keys(row).find(k => keys.some(target => k.toLowerCase().includes(target.toLowerCase())));
+            return rowKey ? row[rowKey] : null;
+          };
+
+          const rawDay = (findKey(["Jour", "Day"]) || "").toString();
+          const dayIdx = DAYS.findIndex(d => d.toLowerCase() === rawDay.toLowerCase() || d.toLowerCase().includes(rawDay.toLowerCase()));
           
+          const start = (findKey(["Début", "Start"]) || "08:00").toString().padStart(5, '0');
+          const end = (findKey(["Fin", "End"]) || "10:00").toString().padStart(5, '0');
+          const subj = findKey(["Matière", "Subject", "Module"]) || "Sans titre";
+          const prof = findKey(["Prof", "Enseignant", "Teacher"]) || "À définir";
+          const room = findKey(["Salle", "Room"]) || "TBD";
+
           return {
             id: `import-${idx}-${Date.now()}`,
             day: dayIdx,
-            starttime: (row.Début || row.Start || "08:00").toString().padStart(5, '0'),
-            endtime: (row.Fin || row.End || "10:00").toString().padStart(5, '0'),
-            subject: row.Matière || row.Subject || row.Module || "Inconnu",
-            teacher: row.Prof || row.Enseignant || "À définir",
-            room: row.Salle || row.Room || "TBD",
+            starttime: start,
+            endtime: end,
+            subject: subj.toString(),
+            teacher: prof.toString(),
+            room: room.toString(),
             color: "#FFFFFF",
             classname: currentClassName
           };
@@ -110,10 +131,12 @@ export default function Schedule() {
         if (importedSlots.length > 0) {
           setSlots(importedSlots);
           setHasUnsavedChanges(true);
-          addNotification({ title: 'Importation', message: `${importedSlots.length} cours chargés. Sauvegardez pour confirmer.`, type: 'success' });
+          addNotification({ title: 'Importation Réussie', message: `${importedSlots.length} cours détectés. N'oubliez pas de sauvegarder.`, type: 'success' });
+        } else {
+          addNotification({ title: 'Format invalide', message: "Vérifiez que vos colonnes s'appellent : Jour, Début, Fin, Matière.", type: 'alert' });
         }
       } catch (err) {
-        addNotification({ title: 'Erreur', message: "Vérifiez le format des colonnes (Jour, Début, Fin, Matière).", type: 'alert' });
+        addNotification({ title: 'Erreur', message: "Échec de lecture du fichier Excel.", type: 'alert' });
       }
     };
     reader.readAsBinaryString(file);
@@ -124,11 +147,11 @@ export default function Schedule() {
     setSaving(true);
     try {
       await API.schedules.saveSlots(currentClassName, slots);
-      addNotification({ title: 'Enregistré', message: 'L\'emploi du temps a été mis à jour.', type: 'success' });
+      addNotification({ title: 'Enregistré', message: 'L\'emploi du temps a été mis à jour avec succès.', type: 'success' });
       setHasUnsavedChanges(false);
       fetchData(true);
     } catch (e: any) {
-      addNotification({ title: 'Échec', message: e.message, type: 'alert' });
+      addNotification({ title: 'Action refusée', message: e.message, type: 'alert' });
     } finally {
       setSaving(false);
     }

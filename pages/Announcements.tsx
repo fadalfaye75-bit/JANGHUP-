@@ -160,7 +160,7 @@ export default function Announcements() {
                   {ann.link && (
                     <a href={ann.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] font-bold text-brand italic hover:underline">
                       <LinkIcon size={12} />
-                      <span>Voir le lien externe</span>
+                      <span>Lien externe</span>
                     </a>
                   )}
                 </div>
@@ -191,10 +191,10 @@ export default function Announcements() {
               <input required value={newAnn.title} onChange={e => setNewAnn({...newAnn, title: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all focus:border-brand" />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-slate-400 italic">Lien externe (optionnel)</label>
+              <label className="text-[10px] font-black uppercase text-slate-400 italic">Lien direct (Optionnel)</label>
               <div className="relative">
                 <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input type="url" placeholder="https://..." value={newAnn.link} onChange={e => setNewAnn({...newAnn, link: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all focus:border-brand" />
+                <input type="url" placeholder="https://votre-lien.com" value={newAnn.link} onChange={e => setNewAnn({...newAnn, link: e.target.value})} className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800 rounded-2xl font-bold italic outline-none border-2 transition-all focus:border-brand" />
               </div>
             </div>
             <div className="space-y-2">
@@ -203,7 +203,7 @@ export default function Announcements() {
             </div>
           </div>
           <button type="submit" disabled={submitting} className="w-full py-5 text-white rounded-[2.5rem] font-black uppercase text-[11px] tracking-widest shadow-premium active:scale-95 transition-all italic" style={{ backgroundColor: themeColor }}>
-            {submitting ? <Loader2 className="animate-spin" size={20} /> : (editingId ? "Mettre à jour l'information" : "Diffuser l'information")}
+            {submitting ? <Loader2 className="animate-spin" size={20} /> : (editingId ? "Mettre à jour" : "Diffuser l'information")}
           </button>
         </form>
       </Modal>
@@ -220,7 +220,7 @@ export default function Announcements() {
                          <LinkIcon size={24} />
                       </div>
                       <div>
-                         <p className="text-[10px] font-black uppercase text-slate-400">Ressource externe</p>
+                         <p className="text-[10px] font-black uppercase text-slate-400">Lien utile</p>
                          <p className="text-xs font-bold truncate max-w-[150px] md:max-w-xs">{viewingAnn.link}</p>
                       </div>
                    </div>

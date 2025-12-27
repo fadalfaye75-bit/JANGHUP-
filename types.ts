@@ -32,7 +32,7 @@ export interface Announcement {
   content: string;
   author: string;
   email?: string;
-  link?: string; // Nouveau champ lien direct
+  link?: string; // Champ lien direct (URL externe)
   date: string;
   classname: string;
   priority: AnnouncementPriority;
